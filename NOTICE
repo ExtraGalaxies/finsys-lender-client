@@ -1,0 +1,11 @@
+@finsys/lender-client
+Copyright 2025 ExtraGalaxies
+
+This is the official API client for the FinSys Lender API, developed by
+ExtraGalaxies, a subsidiary of FinHero. The FinSys Lender API is produced
+and operated by FinHero (https://finhero.asia).
+
+This product includes software developed at ExtraGalaxies
+(https://github.com/ExtraGalaxies).
+
+Licensed under the Apache License, Version 2.0.

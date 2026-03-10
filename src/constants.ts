@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 ExtraGalaxies
+
 export const HEADERS = {
   ENCODED_CODE: 'encoded-Code',
   AUTHORIZATION: 'Authorization',

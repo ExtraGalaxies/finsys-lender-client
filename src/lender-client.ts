@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 ExtraGalaxies
+
 import axios, { type AxiosInstance, type AxiosError } from 'axios'
 import axiosRetry from 'axios-retry'
 import { readFile } from 'node:fs/promises'
@@ -301,10 +304,8 @@ export class LenderClient {
       retryCondition: (error: AxiosError): boolean =>
         axiosRetry.isNetworkOrIdempotentRequestError(error) ||
         (error.response?.status !== undefined && error.response.status >= 500),
-      onRetry: (retryCount, error, requestConfig) => {
-        console.log(
-          `Retrying ${requestConfig.url} (attempt ${retryCount}/${opts.retries ?? 3}): ${error.message}`
-        )
+      onRetry: (_retryCount, _error, _requestConfig) => {
+        // Intentionally silent — consumers can monitor retries via axios interceptors
       },
     })
 

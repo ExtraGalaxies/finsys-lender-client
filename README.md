@@ -1,6 +1,6 @@
 # @finsys/lender-client
 
-Typed API client for the FinSys Lender API with built-in environment management.
+Official typed API client for the FinSys Lender API, developed by [ExtraGalaxies](https://github.com/ExtraGalaxies), a subsidiary of [FinHero](https://finhero.asia). Built-in environment management and strongly typed interfaces.
 
 ## Installation
 
@@ -98,6 +98,12 @@ try {
 | `isAuthenticated()` | `boolean` |
 | `getEnvironment()` | `LenderEnvironment` |
 
+## Data Handling
+
+This package retrieves and transmits loan application data that may contain personally identifiable information (PII). Consumers are responsible for handling this data in compliance with applicable privacy regulations (e.g., PDPA, GDPR).
+
+Credentials and tokens are held in memory only and are not persisted to disk or logs.
+
 ## License
 
-Apache-2.0
+Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
