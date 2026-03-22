@@ -25,4 +25,7 @@ export type {
   UploadResult,
   Program,
   BorrowerAgent,
+  ConsentEvent,
+  ConsentDefinition,
+  ConsentDocument,
 } from './types.js'

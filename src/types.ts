@@ -153,3 +153,30 @@ export interface BorrowerAgent {
   id: number
   name: string
 }
+
+export interface ConsentDocument {
+  id: number
+  name: string
+  type: string
+  displayName?: string
+  url?: string
+  fileId?: string
+  createdAt: string
+}
+
+export interface ConsentDefinition {
+  id: number
+  description: string
+  createdAt: string
+  documents: ConsentDocument[]
+}
+
+export interface ConsentEvent {
+  id: number
+  ihsId: number
+  consentDefinitionId: number
+  consentGiven: boolean
+  ipAddress?: string
+  createdAt: string
+  consentDefinition: ConsentDefinition | null
+}

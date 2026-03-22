@@ -20,6 +20,7 @@ import type {
   UploadableFile,
   UploadResult,
   Program,
+  ConsentEvent,
 } from './types.js'
 
 export class LenderClient {
@@ -236,6 +237,19 @@ export class LenderClient {
       return response.data.data as UploadResult
     } catch (error) {
       throw this.wrapError(error, 'POST', url)
+    }
+  }
+
+  async getConsentsByIhsId(ihsId: string | number): Promise<ConsentEvent[]> {
+    const url = `${this.envConfig.baseUrl}/${ihsId}/consents`
+    const headers = await this.authHeaders()
+
+    try {
+      const client = this.createRetryClient()
+      const response = await client.get(url, { headers })
+      return (response.data?.data ?? []) as ConsentEvent[]
+    } catch (error) {
+      throw this.wrapError(error, 'GET', url)
     }
   }
 
