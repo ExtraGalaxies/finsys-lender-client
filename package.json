@@ -1,6 +1,6 @@
 {
   "name": "@finsys/lender-client",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Typed API client for the FinSys Lender API with built-in environment management",
   "type": "module",
   "main": "dist/index.js",
@@ -12,15 +12,19 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "tsconfig.json"
   ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@finsys/lender-client": "github:ExtraGalaxies/finsys-lender-client#SYS-2149-v2-redesign",
     "axios": "^1.7.2",
     "axios-retry": "^4.5.0",
     "form-data": "^4.0.5"
