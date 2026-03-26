@@ -5,7 +5,7 @@ import axios, { type AxiosInstance, type AxiosError } from 'axios'
 import axiosRetry from 'axios-retry'
 import FormData from 'form-data'
 import { readFile } from 'node:fs/promises'
-import { HEADERS } from './constants.js'
+import { HEADERS, DEFAULT_USER_AGENT } from './constants.js'
 import { LenderApiError } from './errors.js'
 import { BASE_URLS, ENDPOINT_PATHS } from './environments.js'
 import {
@@ -154,8 +154,7 @@ export class LenderClient {
       [HEADERS.AUTHORIZATION]: `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': DEFAULT_USER_AGENT,
     }
   }
 

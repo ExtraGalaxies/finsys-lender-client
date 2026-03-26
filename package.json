@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@finsys/lender-client": "github:ExtraGalaxies/finsys-lender-client#SYS-2149-v2-redesign",
     "axios": "^1.7.2",
     "axios-retry": "^4.5.0",
     "form-data": "^4.0.5"
