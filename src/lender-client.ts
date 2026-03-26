@@ -3,6 +3,7 @@
 
 import axios, { type AxiosInstance, type AxiosError } from 'axios'
 import axiosRetry from 'axios-retry'
+import FormData from 'form-data'
 import { readFile } from 'node:fs/promises'
 import { HEADERS } from './constants.js'
 import { LenderApiError } from './errors.js'
@@ -30,6 +31,8 @@ export class LenderClient {
   private cachedToken: CachedToken | null = null
   /** Deduplicates concurrent login() calls to prevent token refresh races. */
   private pendingLogin: Promise<string> | null = null
+  /** Validate IDs used in URL path construction to prevent path injection. */
+  private static readonly SAFE_ID_PATTERN = /^[\w-]+$/
 
   constructor(config: LenderClientConfig) {
     this.config = config
@@ -199,8 +202,9 @@ export class LenderClient {
   }
 
   async getApplicationDetails(ihsId: string | number): Promise<Application> {
+    const id = this.validateId(ihsId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.DETAILS, String(ihsId))
+      const url = this.resolveUrl(LenderEndpoint.DETAILS, id)
 
       try {
         const client = this.createRetryClient()
@@ -221,8 +225,9 @@ export class LenderClient {
     applicationId: string | number,
     request: StatusUpdateRequest
   ): Promise<StatusUpdateResult> {
+    const id = this.validateId(applicationId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.UPDATE, String(applicationId))
+      const url = this.resolveUrl(LenderEndpoint.UPDATE, id)
 
       try {
         const client = this.createRetryClient()
@@ -242,8 +247,9 @@ export class LenderClient {
   }
 
   async downloadAllDocuments(ihsId: string | number): Promise<DocumentArchive> {
+    const id = this.validateId(ihsId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${ihsId}/download`)
+      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${id}/download`)
 
       try {
         const client = this.createRetryClient()
@@ -273,8 +279,10 @@ export class LenderClient {
     ihsId: string | number,
     documentId: string | number
   ): Promise<FileDownload> {
+    const id = this.validateId(ihsId)
+    const docId = this.validateId(documentId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${ihsId}/download/file/${documentId}`)
+      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${id}/download/file/${docId}`)
 
       try {
         const client = this.createRetryClient()
@@ -316,14 +324,12 @@ export class LenderClient {
     ihsId: string | number,
     file: UploadableFile
   ): Promise<UploadResult> {
+    const id = this.validateId(ihsId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.UPLOAD, `${ihsId}/upload`)
+      const url = this.resolveUrl(LenderEndpoint.UPLOAD, `${id}/upload`)
 
       try {
         const fileBuffer = await readFile(file.path)
-
-        const FormDataModule = await import('form-data')
-        const FormData = FormDataModule.default
         const formData = new FormData()
         formData.append('file', fileBuffer, {
           filename: file.name,
@@ -353,8 +359,9 @@ export class LenderClient {
   }
 
   async getConsentsByIhsId(ihsId: string | number): Promise<ConsentEvent[]> {
+    const id = this.validateId(ihsId)
     return this.withAuth(async (headers) => {
-      const url = this.resolveUrl(LenderEndpoint.CONSENTS, `${ihsId}/consents`)
+      const url = this.resolveUrl(LenderEndpoint.CONSENTS, `${id}/consents`)
 
       try {
         const client = this.createRetryClient()
@@ -386,6 +393,14 @@ export class LenderClient {
   }
 
   // --- Internals ---
+
+  private validateId(id: string | number): string {
+    const str = String(id)
+    if (!str || !LenderClient.SAFE_ID_PATTERN.test(str)) {
+      throw new LenderApiError(`Invalid ID format: ${str}`, { statusCode: 400 })
+    }
+    return str
+  }
 
   private createRetryClient(): AxiosInstance {
     const client = axios.create()

@@ -5,17 +5,17 @@ import type { LenderEnvironment } from './types.js'
 import { LenderEndpoint } from './types.js'
 
 export const BASE_URLS: Record<LenderEnvironment, string> = {
-  staging: 'https://api.finhero.asia/stage/buyerfuel/lender/v1',
-  production: 'https://api.finhero.asia/buyerfuel/lender/v1',
+  staging: 'https://finsys-api-stage.finhero.asia/lender',
+  production: 'https://finsys-api.finhero.asia/lender',
 }
 
 export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   [LenderEndpoint.LOGIN]: '/login',
-  [LenderEndpoint.LIST]: '/list',
-  [LenderEndpoint.DETAILS]: '',
-  [LenderEndpoint.UPDATE]: '/update',
-  [LenderEndpoint.DOWNLOAD]: '',
-  [LenderEndpoint.UPLOAD]: '',
-  [LenderEndpoint.PROGRAMS]: '/programs',
-  [LenderEndpoint.CONSENTS]: '',
+  [LenderEndpoint.LIST]: '/ihs/list',
+  [LenderEndpoint.DETAILS]: '/ihs',
+  [LenderEndpoint.UPDATE]: '/ihs/update',
+  [LenderEndpoint.DOWNLOAD]: '/ihs',
+  [LenderEndpoint.UPLOAD]: '/ihs',
+  [LenderEndpoint.PROGRAMS]: '/program',
+  [LenderEndpoint.CONSENTS]: '/ihs',
 }
