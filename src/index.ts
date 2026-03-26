@@ -3,29 +3,30 @@
 
 export { LenderClient } from './lender-client.js'
 export { LenderApiError } from './errors.js'
-export { getEnvironmentConfig } from './environments.js'
-export type { EnvironmentConfig } from './environments.js'
+export { BASE_URLS, ENDPOINT_PATHS } from './environments.js'
 export { HEADERS, ERROR_MESSAGE, ERROR_CODES } from './constants.js'
 
-export type {
-  LenderEnvironment,
-  LenderCredentials,
-  LenderClientConfig,
-  RetryOptions,
-  TokenCacheOptions,
-  ApplicationListFilter,
-  StatusUpdateRequest,
-  UploadableFile,
-  ApplicationListResult,
-  Pagination,
-  Application,
-  StatusUpdateResult,
-  DocumentArchive,
-  FileDownload,
-  UploadResult,
-  Program,
-  BorrowerAgent,
-  ConsentEvent,
-  ConsentDefinition,
-  ConsentDocument,
+export {
+  LenderEndpoint,
+  type LenderEnvironment,
+  type LenderCredentials,
+  type LenderClientConfig,
+  type CachedToken,
+  type RetryOptions,
+  type TokenCacheOptions,
+  type ApplicationListFilter,
+  type StatusUpdateRequest,
+  type UploadableFile,
+  type ApplicationListResult,
+  type Pagination,
+  type Application,
+  type StatusUpdateResult,
+  type DocumentArchive,
+  type FileDownload,
+  type UploadResult,
+  type Program,
+  type BorrowerAgent,
+  type ConsentEvent,
+  type ConsentDefinition,
+  type ConsentDocument,
 } from './types.js'

@@ -6,307 +6,386 @@ import axiosRetry from 'axios-retry'
 import { readFile } from 'node:fs/promises'
 import { HEADERS } from './constants.js'
 import { LenderApiError } from './errors.js'
-import { getEnvironmentConfig, type EnvironmentConfig } from './environments.js'
-import type {
-  LenderClientConfig,
-  LenderEnvironment,
-  Application,
-  ApplicationListFilter,
-  ApplicationListResult,
-  StatusUpdateRequest,
-  StatusUpdateResult,
-  DocumentArchive,
-  FileDownload,
-  UploadableFile,
-  UploadResult,
-  Program,
-  ConsentEvent,
+import { BASE_URLS, ENDPOINT_PATHS } from './environments.js'
+import {
+  LenderEndpoint,
+  type LenderClientConfig,
+  type LenderEnvironment,
+  type CachedToken,
+  type Application,
+  type ApplicationListFilter,
+  type ApplicationListResult,
+  type StatusUpdateRequest,
+  type StatusUpdateResult,
+  type DocumentArchive,
+  type FileDownload,
+  type UploadableFile,
+  type UploadResult,
+  type Program,
+  type ConsentEvent,
 } from './types.js'
 
 export class LenderClient {
   private readonly config: LenderClientConfig
-  private readonly envConfig: EnvironmentConfig
-  private cachedToken: string | null = null
-  private tokenExpiry: number | undefined = undefined
+  private cachedToken: CachedToken | null = null
+  /** Deduplicates concurrent login() calls to prevent token refresh races. */
+  private pendingLogin: Promise<string> | null = null
 
   constructor(config: LenderClientConfig) {
     this.config = config
-    this.envConfig = getEnvironmentConfig(config.environment)
   }
 
-  // --- Public API ---
+  // --- URL Resolution ---
+
+  /**
+   * Resolve the full URL for a given endpoint.
+   * Uses endpointOverrides if provided, otherwise derives from environment base URL.
+   */
+  private resolveUrl(endpoint: LenderEndpoint, suffix?: string): string {
+    const override = this.config.endpointOverrides?.[endpoint]
+    if (override) {
+      return suffix ? `${override}/${suffix}` : override
+    }
+    const base = BASE_URLS[this.config.environment]
+    const path = ENDPOINT_PATHS[endpoint]
+    const url = `${base}${path}`
+    return suffix ? `${url}/${suffix}` : url
+  }
+
+  // --- Authentication ---
 
   async login(): Promise<void> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.login}`
-    const headers = this.getLoginHeaders()
+    const now = Date.now()
+
+    if (this.cachedToken && this.cachedToken.expiresAt - 30_000 > now) {
+      return
+    }
+
+    if (this.pendingLogin) {
+      await this.pendingLogin
+      return
+    }
+
+    this.pendingLogin = this.performLogin(now)
+    try {
+      await this.pendingLogin
+    } finally {
+      this.pendingLogin = null
+    }
+  }
+
+  private async performLogin(now: number): Promise<string> {
+    const { clientId, clientSecret } = this.config.credentials
+    if (!clientId || !clientSecret) {
+      throw new LenderApiError('Client credentials (clientId and clientSecret) are required', {
+        isAuthError: true,
+      })
+    }
+
+    const url = this.resolveUrl(LenderEndpoint.LOGIN)
+    const encoded = Buffer.from(`${clientId}|${clientSecret}`).toString('base64')
 
     try {
       const client = this.createRetryClient()
-      const response = await client.post(url, {}, { headers })
+      const response = await client.post(url, {}, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          [HEADERS.ENCODED_CODE]: encoded,
+        },
+        timeout: 15_000,
+      })
 
       const token: string | undefined = response.data?.token
-      const tokenExpiredDate: string | undefined = response.data?.tokenExpiredDate
-
       if (!token) {
         throw new LenderApiError('Login failed - no access token received', {
           isAuthError: true,
         })
       }
 
-      this.cachedToken = token
+      const tokenExpiredDate: string | undefined = response.data?.tokenExpiredDate
+      const expiresIn = response.data?.expires_in || response.data?.expiresIn
+      let expiresAt: number
 
-      if (tokenExpiredDate) {
+      if (expiresIn) {
+        expiresAt = now + expiresIn * 1000
+      } else if (tokenExpiredDate) {
         const expiryTimestamp = new Date(tokenExpiredDate).getTime()
-        this.tokenExpiry = Number.isNaN(expiryTimestamp)
-          ? this.defaultExpiry()
-          : expiryTimestamp
+        expiresAt = Number.isNaN(expiryTimestamp) ? this.defaultExpiry() : expiryTimestamp
       } else {
-        this.tokenExpiry = this.defaultExpiry()
+        expiresAt = this.defaultExpiry()
       }
+
+      this.cachedToken = { token, expiresAt }
+      return token
     } catch (error) {
       if (error instanceof LenderApiError) throw error
       throw this.wrapError(error, 'POST', url)
     }
   }
 
-  async getApplicationList(
-    filter?: ApplicationListFilter,
-    page?: number,
-    size: number = 20
-  ): Promise<ApplicationListResult> {
-    const url = this.buildListUrl(size, page, filter)
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, { headers })
-
-      return {
-        applications: response.data?.data?.list ?? [],
-        pagination: response.data?.data?.pagination ?? null,
-      }
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
-  }
-
-  async getApplicationDetails(ihsId: string | number): Promise<Application> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.details}/${ihsId}`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, { headers })
-
-      if (!response.data?.data) {
-        throw new LenderApiError(`Application ${ihsId} not found`, { statusCode: 404 })
-      }
-
-      return response.data.data as Application
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
-  }
-
-  async updateApplicationStatus(
-    applicationId: string | number,
-    request: StatusUpdateRequest
-  ): Promise<StatusUpdateResult> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.update}/${applicationId}`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.patch(url, request, { headers })
-
-      if (!response.data) {
-        throw new LenderApiError(`Failed to update application ${applicationId}`, {
-          statusCode: 400,
-        })
-      }
-
-      return response.data as StatusUpdateResult
-    } catch (error) {
-      throw this.wrapError(error, 'PATCH', url)
-    }
-  }
-
-  async downloadAllDocuments(ihsId: string | number): Promise<DocumentArchive> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.details}/${ihsId}${this.envConfig.paths.download}`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, {
-        headers,
-        responseType: 'arraybuffer',
-        timeout: 120_000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024,
-      })
-
-      if (!response.data) {
-        throw new LenderApiError('No document archive received from server')
-      }
-
-      return {
-        data: Buffer.from(response.data),
-        contentType: (response.headers['content-type'] as string) || 'application/zip',
-      }
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
-  }
-
-  async downloadFile(
-    ihsId: string | number,
-    documentId: string | number
-  ): Promise<FileDownload> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.details}/${ihsId}${this.envConfig.paths.download}/file/${documentId}`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, {
-        headers,
-        responseType: 'arraybuffer',
-        timeout: 60_000,
-        maxContentLength: 50 * 1024 * 1024,
-      })
-
-      if (!response.data) {
-        throw new LenderApiError('No file data received from server')
-      }
-
-      const contentType =
-        (response.headers['content-type'] as string) || 'application/octet-stream'
-      const contentDisposition = response.headers['content-disposition'] as string | undefined
-      let fileName = String(documentId)
-
-      if (contentDisposition) {
-        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition)
-        if (matches?.[1]) {
-          fileName = matches[1].replace(/['"]/g, '')
-        }
-      }
-
-      return {
-        data: Buffer.from(response.data),
-        contentType,
-        fileName,
-      }
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
-  }
-
-  async uploadDocument(
-    ihsId: string | number,
-    file: UploadableFile
-  ): Promise<UploadResult> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.details}/${ihsId}/upload`
-    const headers = await this.authHeaders()
-
-    try {
-      const fileBuffer = await readFile(file.path)
-
-      // Use form-data package for multipart
-      const FormDataModule = await import('form-data')
-      const FormData = FormDataModule.default
-      const formData = new FormData()
-      formData.append('file', fileBuffer, {
-        filename: file.name,
-        contentType: file.mimeType || 'application/octet-stream',
-      })
-
-      const client = this.createRetryClient()
-      const response = await client.post(url, formData, {
-        headers: {
-          ...headers,
-          ...formData.getHeaders(),
-        },
-        timeout: 60_000,
-        maxContentLength: 10 * 1024 * 1024,
-        maxBodyLength: 10 * 1024 * 1024,
-      })
-
-      if (!response.data?.data) {
-        throw new LenderApiError('No upload result received from server')
-      }
-
-      return response.data.data as UploadResult
-    } catch (error) {
-      throw this.wrapError(error, 'POST', url)
-    }
-  }
-
-  async getConsentsByIhsId(ihsId: string | number): Promise<ConsentEvent[]> {
-    const url = `${this.envConfig.baseUrl}/${ihsId}/consents`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, { headers })
-      return (response.data?.data ?? []) as ConsentEvent[]
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
-  }
-
-  async getPrograms(): Promise<Program[]> {
-    const url = `${this.envConfig.baseUrl}${this.envConfig.paths.programs}`
-    const headers = await this.authHeaders()
-
-    try {
-      const client = this.createRetryClient()
-      const response = await client.get(url, { headers })
-
-      if (!response.data?.data) {
-        throw new LenderApiError('No program data returned from API', { statusCode: 404 })
-      }
-
-      return response.data.data as Program[]
-    } catch (error) {
-      throw this.wrapError(error, 'GET', url)
-    }
+  invalidateToken(): void {
+    this.cachedToken = null
   }
 
   isAuthenticated(): boolean {
-    return !!(this.cachedToken && this.tokenExpiry && Date.now() <= this.tokenExpiry)
+    return !!(this.cachedToken && this.cachedToken.expiresAt - 30_000 > Date.now())
   }
 
   getEnvironment(): LenderEnvironment {
     return this.config.environment
   }
 
-  // --- Internals ---
+  // --- Request Helpers ---
 
   private async getValidToken(): Promise<string> {
-    if (this.isAuthenticated()) {
-      return this.cachedToken!
+    if (this.cachedToken && this.cachedToken.expiresAt - 30_000 > Date.now()) {
+      return this.cachedToken.token
     }
     await this.login()
-    return this.cachedToken!
+    return this.cachedToken!.token
   }
 
   private async authHeaders(): Promise<Record<string, string>> {
     const token = await this.getValidToken()
     return {
       [HEADERS.AUTHORIZATION]: `Bearer ${token}`,
-      [HEADERS.SUBSCRIPTION_KEY]: this.config.credentials.subscriptionKey,
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
   }
 
-  private getLoginHeaders(): Record<string, string> {
-    const encoded = Buffer.from(
-      `${this.config.credentials.clientId}|${this.config.credentials.clientSecret}`
-    ).toString('base64')
+  /**
+   * Execute an authenticated request with automatic 401 retry.
+   */
+  private async withAuth<T>(fn: (headers: Record<string, string>) => Promise<T>): Promise<T> {
+    const headers = await this.authHeaders()
 
-    return {
-      [HEADERS.ENCODED_CODE]: encoded,
-      [HEADERS.SUBSCRIPTION_KEY]: this.config.credentials.subscriptionKey,
+    try {
+      return await fn(headers)
+    } catch (error) {
+      if (error instanceof LenderApiError && error.statusCode === 401) {
+        this.invalidateToken()
+        const retryHeaders = await this.authHeaders()
+        return fn(retryHeaders)
+      }
+      throw error
     }
   }
+
+  // --- Public API ---
+
+  async getApplicationList(
+    filter?: ApplicationListFilter,
+    page?: number,
+    size: number = 20
+  ): Promise<ApplicationListResult> {
+    return this.withAuth(async (headers) => {
+      const url = this.buildListUrl(size, page, filter)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        return {
+          applications: response.data?.data?.list ?? [],
+          pagination: response.data?.data?.pagination ?? null,
+        }
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async getApplicationDetails(ihsId: string | number): Promise<Application> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.DETAILS, String(ihsId))
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        if (!response.data?.data) {
+          throw new LenderApiError(`Application ${ihsId} not found`, { statusCode: 404 })
+        }
+
+        return response.data.data as Application
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async updateApplicationStatus(
+    applicationId: string | number,
+    request: StatusUpdateRequest
+  ): Promise<StatusUpdateResult> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.UPDATE, String(applicationId))
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.patch(url, request, { headers })
+
+        if (!response.data) {
+          throw new LenderApiError(`Failed to update application ${applicationId}`, {
+            statusCode: 400,
+          })
+        }
+
+        return response.data as StatusUpdateResult
+      } catch (error) {
+        throw this.wrapError(error, 'PATCH', url)
+      }
+    })
+  }
+
+  async downloadAllDocuments(ihsId: string | number): Promise<DocumentArchive> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${ihsId}/download`)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, {
+          headers,
+          responseType: 'arraybuffer',
+          timeout: 120_000,
+          maxContentLength: 100 * 1024 * 1024,
+          maxBodyLength: 100 * 1024 * 1024,
+        })
+
+        if (!response.data) {
+          throw new LenderApiError('No document archive received from server')
+        }
+
+        return {
+          data: Buffer.from(response.data),
+          contentType: (response.headers['content-type'] as string) || 'application/zip',
+        }
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async downloadFile(
+    ihsId: string | number,
+    documentId: string | number
+  ): Promise<FileDownload> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.DOWNLOAD, `${ihsId}/download/file/${documentId}`)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, {
+          headers,
+          responseType: 'arraybuffer',
+          timeout: 60_000,
+          maxContentLength: 50 * 1024 * 1024,
+        })
+
+        if (!response.data) {
+          throw new LenderApiError('No file data received from server')
+        }
+
+        const contentType =
+          (response.headers['content-type'] as string) || 'application/octet-stream'
+        const contentDisposition = response.headers['content-disposition'] as string | undefined
+        let fileName = String(documentId)
+
+        if (contentDisposition) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition)
+          if (matches?.[1]) {
+            fileName = matches[1].replace(/['"]/g, '')
+          }
+        }
+
+        return {
+          data: Buffer.from(response.data),
+          contentType,
+          fileName,
+        }
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async uploadDocument(
+    ihsId: string | number,
+    file: UploadableFile
+  ): Promise<UploadResult> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.UPLOAD, `${ihsId}/upload`)
+
+      try {
+        const fileBuffer = await readFile(file.path)
+
+        const FormDataModule = await import('form-data')
+        const FormData = FormDataModule.default
+        const formData = new FormData()
+        formData.append('file', fileBuffer, {
+          filename: file.name,
+          contentType: file.mimeType || 'application/octet-stream',
+        })
+
+        const client = this.createRetryClient()
+        const response = await client.post(url, formData, {
+          headers: {
+            ...headers,
+            ...formData.getHeaders(),
+          },
+          timeout: 60_000,
+          maxContentLength: 10 * 1024 * 1024,
+          maxBodyLength: 10 * 1024 * 1024,
+        })
+
+        if (!response.data?.data) {
+          throw new LenderApiError('No upload result received from server')
+        }
+
+        return response.data.data as UploadResult
+      } catch (error) {
+        throw this.wrapError(error, 'POST', url)
+      }
+    })
+  }
+
+  async getConsentsByIhsId(ihsId: string | number): Promise<ConsentEvent[]> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.CONSENTS, `${ihsId}/consents`)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+        return (response.data?.data ?? []) as ConsentEvent[]
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async getPrograms(): Promise<Program[]> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.PROGRAMS)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        if (!response.data?.data) {
+          throw new LenderApiError('No program data returned from API', { statusCode: 404 })
+        }
+
+        return response.data.data as Program[]
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  // --- Internals ---
 
   private createRetryClient(): AxiosInstance {
     const client = axios.create()
@@ -340,7 +419,7 @@ export class LenderClient {
   }
 
   private buildListUrl(size: number, page?: number, filter?: ApplicationListFilter): string {
-    const base = `${this.envConfig.baseUrl}${this.envConfig.paths.list}`
+    const base = this.resolveUrl(LenderEndpoint.LIST)
     const params = new URLSearchParams()
 
     if (page !== undefined) params.set('page', String(page))

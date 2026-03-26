@@ -1,6 +1,6 @@
 {
   "name": "@finsys/lender-client",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Typed API client for the FinSys Lender API with built-in environment management",
   "type": "module",
   "main": "dist/index.js",

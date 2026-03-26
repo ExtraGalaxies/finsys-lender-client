@@ -4,7 +4,6 @@
 export const HEADERS = {
   ENCODED_CODE: 'encoded-Code',
   AUTHORIZATION: 'Authorization',
-  SUBSCRIPTION_KEY: 'Subscription-Key',
 } as const
 
 export const ERROR_MESSAGE = {
@@ -19,5 +18,4 @@ export const ERROR_MESSAGE = {
 export const ERROR_CODES = {
   MISSING_ENCODED_CODE: 'MISSING_ENCODED_CODE',
   MISSING_ACCESS_TOKEN: 'MISSING_ACCESS_TOKEN',
-  MISSING_SUBSCRIPTION_KEY: 'MISSING_SUBSCRIPTION_KEY',
 } as const

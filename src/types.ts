@@ -5,15 +5,27 @@
 
 export type LenderEnvironment = 'staging' | 'production'
 
+export enum LenderEndpoint {
+  LOGIN = 'login',
+  LIST = 'list',
+  DETAILS = 'details',
+  UPDATE = 'update',
+  DOWNLOAD = 'download',
+  UPLOAD = 'upload',
+  PROGRAMS = 'programs',
+  CONSENTS = 'consents',
+}
+
 export interface LenderCredentials {
   clientId: string
   clientSecret: string
-  subscriptionKey: string
 }
 
 export interface LenderClientConfig {
   environment: LenderEnvironment
   credentials: LenderCredentials
+  /** Optional per-endpoint full URL overrides */
+  endpointOverrides?: Partial<Record<LenderEndpoint, string>>
   retryOptions?: RetryOptions
   tokenCacheOptions?: TokenCacheOptions
 }
@@ -25,6 +37,11 @@ export interface RetryOptions {
 
 export interface TokenCacheOptions {
   defaultExpiryHours?: number
+}
+
+export interface CachedToken {
+  token: string
+  expiresAt: number
 }
 
 // --- Request Types ---
