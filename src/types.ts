@@ -14,6 +14,7 @@ export enum LenderEndpoint {
   UPLOAD = 'upload',
   PROGRAMS = 'programs',
   CONSENTS = 'consents',
+  CONSENT_DEFINITIONS = 'consent_definitions',
 }
 
 export interface LenderCredentials {
