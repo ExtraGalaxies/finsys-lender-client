@@ -24,6 +24,7 @@ import {
   type UploadResult,
   type Program,
   type ConsentEvent,
+  type ConsentDefinition,
 } from './types.js'
 
 export class LenderClient {
@@ -385,6 +386,20 @@ export class LenderClient {
         }
 
         return response.data.data as Program[]
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async getConsentDefinitions(): Promise<ConsentDefinition[]> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.CONSENT_DEFINITIONS)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+        return (response.data?.data ?? []) as ConsentDefinition[]
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }

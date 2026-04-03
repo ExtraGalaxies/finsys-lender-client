@@ -18,4 +18,5 @@ export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   [LenderEndpoint.UPLOAD]: '/ihs',
   [LenderEndpoint.PROGRAMS]: '/program',
   [LenderEndpoint.CONSENTS]: '/ihs',
+  [LenderEndpoint.CONSENT_DEFINITIONS]: '/consent-definitions',
 }
