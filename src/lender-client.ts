@@ -415,7 +415,7 @@ export class LenderClient {
       try {
         const client = this.createRetryClient()
         const response = await client.get(url, { headers })
-        return (response.data?.documents ?? []) as ExtractionJobStatus[]
+        return (response.data?.data?.documents ?? []) as ExtractionJobStatus[]
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }
