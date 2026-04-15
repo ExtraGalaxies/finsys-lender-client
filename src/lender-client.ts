@@ -25,6 +25,7 @@ import {
   type Program,
   type ConsentEvent,
   type ConsentDefinition,
+  type ExtractionJobStatus,
 } from './types.js'
 
 export class LenderClient {
@@ -400,6 +401,21 @@ export class LenderClient {
         const client = this.createRetryClient()
         const response = await client.get(url, { headers })
         return (response.data?.data ?? []) as ConsentDefinition[]
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  async getExtractionStatus(ihsId: string | number): Promise<ExtractionJobStatus[]> {
+    const id = this.validateId(ihsId)
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.EXTRACTION_STATUS, `${id}/extraction-status`)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+        return (response.data?.documents ?? []) as ExtractionJobStatus[]
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }

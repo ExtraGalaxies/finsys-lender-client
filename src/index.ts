@@ -29,4 +29,5 @@ export {
   type ConsentEvent,
   type ConsentDefinition,
   type ConsentDocument,
+  type ExtractionJobStatus,
 } from './types.js'
