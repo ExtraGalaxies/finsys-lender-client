@@ -15,6 +15,7 @@ export enum LenderEndpoint {
   PROGRAMS = 'programs',
   CONSENTS = 'consents',
   CONSENT_DEFINITIONS = 'consent_definitions',
+  EXTRACTION_STATUS = 'extraction_status',
 }
 
 export interface LenderCredentials {
@@ -197,4 +198,16 @@ export interface ConsentEvent {
   ipAddress?: string
   createdAt: string
   consentDefinition: ConsentDefinition | null
+}
+
+export interface ExtractionJobStatus {
+  fileId: number
+  fileType: string
+  fileIndex: number
+  fileName: string | null
+  status: string
+  errorMessage: string | null
+  attemptCount: number
+  startedAt: string | null
+  completedAt: string | null
 }
