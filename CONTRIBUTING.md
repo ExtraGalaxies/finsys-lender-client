@@ -40,7 +40,7 @@ Project maintainers may remove, edit, or reject contributions that do not align 
 1. Fork the repository
 2. Create a feature branch from `main`
 3. Make your changes
-4. Ensure TypeScript compiles without errors: `npm run typecheck`
+4. Ensure TypeScript compiles without errors: `npm run lint`
 5. Submit a pull request with a clear description of the changes
 
 ### Development Setup
@@ -49,7 +49,7 @@ Project maintainers may remove, edit, or reject contributions that do not align 
 git clone https://github.com/ExtraGalaxies/finsys-lender-client.git
 cd finsys-lender-client
 npm install
-npm run typecheck
+npm run lint
 npm run build
 ```
 
