@@ -1,6 +1,10 @@
 {
   "name": "@finsys/lender-client",
   "version": "2.2.0",
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11.10.0"
+  },
   "description": "Typed API client for the FinSys Lender API with built-in environment management",
   "type": "module",
   "main": "dist/index.js",
@@ -29,8 +33,12 @@
     "form-data": "^4.0.5"
   },
   "devDependencies": {
+    "@lavamoat/allow-scripts": "^5.0.2",
     "@types/node": "^20.14.9",
     "typescript": "~5.4"
+  },
+  "lavamoat": {
+    "allowScripts": {}
   },
   "license": "Apache-2.0",
   "repository": {
