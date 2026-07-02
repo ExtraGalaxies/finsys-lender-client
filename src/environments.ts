@@ -20,4 +20,6 @@ export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   [LenderEndpoint.CONSENTS]: '/ihs',
   [LenderEndpoint.CONSENT_DEFINITIONS]: '/consent-definitions',
   [LenderEndpoint.EXTRACTION_STATUS]: '/ihs',
+  [LenderEndpoint.INSTALLER_LATEST]: '/installer/latest',
+  [LenderEndpoint.INSTALLER_DOWNLOAD_URL]: '/installer/download-url',
 }

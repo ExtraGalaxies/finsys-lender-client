@@ -16,6 +16,8 @@ export enum LenderEndpoint {
   CONSENTS = 'consents',
   CONSENT_DEFINITIONS = 'consent_definitions',
   EXTRACTION_STATUS = 'extraction_status',
+  INSTALLER_LATEST = 'installer_latest',
+  INSTALLER_DOWNLOAD_URL = 'installer_download_url',
 }
 
 export interface LenderCredentials {
