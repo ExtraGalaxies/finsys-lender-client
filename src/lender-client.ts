@@ -422,6 +422,48 @@ export class LenderClient {
     })
   }
 
+  /** Returns the latest FinSys installer version string, e.g. "1.0.2446". */
+  async getLatestInstallerVersion(): Promise<string> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.INSTALLER_LATEST)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        const version = response.data?.data?.version
+        if (typeof version !== 'string' || version.trim() === '') {
+          throw new LenderApiError('No installer version returned from API', { statusCode: 404 })
+        }
+        return version
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  /** Returns a fresh 24h read-only SAS download URL for the latest installer. */
+  async getInstallerDownloadUrl(): Promise<string> {
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.INSTALLER_DOWNLOAD_URL)
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        const downloadUrl = response.data?.data?.url
+        if (typeof downloadUrl !== 'string' || downloadUrl.trim() === '') {
+          throw new LenderApiError('No installer download URL returned from API', {
+            statusCode: 404,
+          })
+        }
+        return downloadUrl
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
   // --- Internals ---
 
   private validateId(id: string | number): string {
