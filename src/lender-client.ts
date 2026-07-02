@@ -431,8 +431,8 @@ export class LenderClient {
         const client = this.createRetryClient()
         const response = await client.get(url, { headers })
 
-        const version: string | undefined = response.data?.data?.version
-        if (!version) {
+        const version = response.data?.data?.version
+        if (typeof version !== 'string' || version.trim() === '') {
           throw new LenderApiError('No installer version returned from API', { statusCode: 404 })
         }
         return version
@@ -451,8 +451,8 @@ export class LenderClient {
         const client = this.createRetryClient()
         const response = await client.get(url, { headers })
 
-        const downloadUrl: string | undefined = response.data?.data?.url
-        if (!downloadUrl) {
+        const downloadUrl = response.data?.data?.url
+        if (typeof downloadUrl !== 'string' || downloadUrl.trim() === '') {
           throw new LenderApiError('No installer download URL returned from API', {
             statusCode: 404,
           })
