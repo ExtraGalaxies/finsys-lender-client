@@ -26,6 +26,8 @@ import {
   type ConsentEvent,
   type ConsentDefinition,
   type ExtractionJobStatus,
+  type UpdateChannel,
+  type UpdateFeedSas,
 } from './types.js'
 
 export class LenderClient {
@@ -442,7 +444,11 @@ export class LenderClient {
     })
   }
 
-  /** Returns a fresh 24h read-only SAS download URL for the latest installer. */
+  /**
+   * @deprecated SYS-2797 — superseded by getUpdateFeedSas (container-scoped feed SAS
+   * for electron-updater). Retained until callers migrate.
+   * Returns a fresh 24h read-only SAS download URL for the latest installer.
+   */
   async getInstallerDownloadUrl(): Promise<string> {
     return this.withAuth(async (headers) => {
       const url = this.resolveUrl(LenderEndpoint.INSTALLER_DOWNLOAD_URL)
@@ -458,6 +464,47 @@ export class LenderClient {
           })
         }
         return downloadUrl
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  /**
+   * Returns a container-scoped, read-only SAS (~2h) for the given build channel's
+   * update feed, so the desktop auto-updater can fetch latest.yml + .blockmap +
+   * installer with one token. Supersedes getInstallerDownloadUrl.
+   */
+  async getUpdateFeedSas(channel: UpdateChannel): Promise<UpdateFeedSas> {
+    if (channel !== 'signed' && channel !== 'unsigned') {
+      throw new LenderApiError(
+        `Invalid channel: ${channel}. Must be 'signed' or 'unsigned'`,
+        { statusCode: 400 }
+      )
+    }
+    return this.withAuth(async (headers) => {
+      const base = this.resolveUrl(LenderEndpoint.INSTALLER_UPDATE_FEED)
+      const url = `${base}?channel=${encodeURIComponent(channel)}`
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        const feed = response.data?.data as UpdateFeedSas | undefined
+        if (
+          !feed ||
+          typeof feed.containerUrl !== 'string' ||
+          feed.containerUrl.trim() === '' ||
+          typeof feed.sasToken !== 'string' ||
+          feed.sasToken.trim() === '' ||
+          typeof feed.expiresOn !== 'string' ||
+          feed.expiresOn.trim() === ''
+        ) {
+          throw new LenderApiError('No update-feed SAS returned from API', {
+            statusCode: 404,
+          })
+        }
+        return feed
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }

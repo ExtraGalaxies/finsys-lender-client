@@ -30,4 +30,6 @@ export {
   type ConsentDefinition,
   type ConsentDocument,
   type ExtractionJobStatus,
+  type UpdateChannel,
+  type UpdateFeedSas,
 } from './types.js'
