@@ -51,6 +51,10 @@ await client.uploadDocument(12345, {
 
 // List programs
 const programs = await client.getPrograms()
+
+// Get a container-scoped update-feed SAS for the desktop auto-updater
+const feed = await client.getUpdateFeedSas('signed')
+// Compose per-file URLs: `${feed.containerUrl}/latest.yml?${feed.sasToken}`
 ```
 
 ## Environments

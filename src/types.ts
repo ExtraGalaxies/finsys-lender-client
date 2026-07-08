@@ -18,6 +18,7 @@ export enum LenderEndpoint {
   EXTRACTION_STATUS = 'extraction_status',
   INSTALLER_LATEST = 'installer_latest',
   INSTALLER_DOWNLOAD_URL = 'installer_download_url',
+  INSTALLER_UPDATE_FEED = 'installer_update_feed',
 }
 
 export interface LenderCredentials {
@@ -79,6 +80,18 @@ export interface UploadableFile {
 }
 
 // --- Response Types ---
+
+/** Build channel from the client's build metadata: signed vs unsigned installer. */
+export type UpdateChannel = 'signed' | 'unsigned'
+
+export interface UpdateFeedSas {
+  /** Container base URL (no trailing slash). Append /latest.yml, /<file>.blockmap, /<file>.exe. */
+  containerUrl: string
+  /** SAS query string WITHOUT a leading '?'. Append to each feed-file URL. */
+  sasToken: string
+  /** ISO-8601 SAS expiry. */
+  expiresOn: string
+}
 
 export interface ApplicationListResult {
   applications: Application[]

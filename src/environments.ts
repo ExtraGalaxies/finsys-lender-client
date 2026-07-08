@@ -22,4 +22,5 @@ export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   [LenderEndpoint.EXTRACTION_STATUS]: '/ihs',
   [LenderEndpoint.INSTALLER_LATEST]: '/installer/latest',
   [LenderEndpoint.INSTALLER_DOWNLOAD_URL]: '/installer/download-url',
+  [LenderEndpoint.INSTALLER_UPDATE_FEED]: '/installer/update-feed',
 }
