@@ -476,6 +476,12 @@ export class LenderClient {
    * installer with one token. Supersedes getInstallerDownloadUrl.
    */
   async getUpdateFeedSas(channel: UpdateChannel): Promise<UpdateFeedSas> {
+    if (channel !== 'signed' && channel !== 'unsigned') {
+      throw new LenderApiError(
+        `Invalid channel: ${channel}. Must be 'signed' or 'unsigned'`,
+        { statusCode: 400 }
+      )
+    }
     return this.withAuth(async (headers) => {
       const base = this.resolveUrl(LenderEndpoint.INSTALLER_UPDATE_FEED)
       const url = `${base}?channel=${encodeURIComponent(channel)}`
@@ -490,7 +496,9 @@ export class LenderClient {
           typeof feed.containerUrl !== 'string' ||
           feed.containerUrl.trim() === '' ||
           typeof feed.sasToken !== 'string' ||
-          feed.sasToken.trim() === ''
+          feed.sasToken.trim() === '' ||
+          typeof feed.expiresOn !== 'string' ||
+          feed.expiresOn.trim() === ''
         ) {
           throw new LenderApiError('No update-feed SAS returned from API', {
             statusCode: 404,
