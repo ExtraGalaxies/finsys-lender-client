@@ -8,6 +8,15 @@ Official typed API client for the FinSys Lender API, developed by [ExtraGalaxies
 npm install @finsys/lender-client
 ```
 
+## Prerequisites (contributors)
+
+This package targets Node 24.16.0 and npm >= 12.0.1. After selecting the pinned Node version, upgrade npm to the required baseline:
+
+```bash
+nvm use              # picks up .nvmrc (24.16.0)
+npm install -g npm@12.0.1
+```
+
 ## Usage
 
 ```typescript
