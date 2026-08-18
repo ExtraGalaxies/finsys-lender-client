@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 ExtraGalaxies
 
+// SYS-3334: the v2 envelope types are @finsys/core's; re-exported below.
+import type {
+  CanonicalFieldEnvelope,
+  CanonicalInstance,
+  CanonicalCategory,
+  CanonicalView,
+  CanonicalAddress,
+} from '@finsys/core'
+
 // --- Environment & Configuration ---
 
 export type LenderEnvironment = 'staging' | 'production'
@@ -261,13 +270,6 @@ export interface ExtractionJobStatus {
  * test.ts` proves, both ways, that what such a consumer held is assignable to
  * and from what core now declares.
  */
-import type {
-  CanonicalFieldEnvelope,
-  CanonicalInstance,
-  CanonicalCategory,
-  CanonicalView,
-  CanonicalAddress,
-} from '@finsys/core'
 export type {
   CanonicalFieldEnvelope,
   CanonicalInstance,
