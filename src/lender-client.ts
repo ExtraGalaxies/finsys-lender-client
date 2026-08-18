@@ -14,6 +14,8 @@ import {
   type LenderEnvironment,
   type CachedToken,
   type Application,
+  type CanonicalView,
+  type ApplicationRecord,
   type ApplicationListFilter,
   type ApplicationListResult,
   type StatusUpdateRequest,
@@ -198,6 +200,72 @@ export class LenderClient {
           applications: response.data?.data?.list ?? [],
           pagination: response.data?.data?.pagination ?? null,
         }
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  /**
+   * SYS-3416 — the canonical (v2) read: facts, each carrying its provenance.
+   *
+   * NOT a drop-in replacement for getApplicationDetails. That one merges THIS
+   * LENDER'S pending edit overlay before returning, so its values are the
+   * lender's current working values; these are the attested facts. Both are
+   * defensible inputs to a decision; switching between them silently is not.
+   *
+   * The response is scoped to ONE application — see CanonicalView.
+   *
+   * @param include Category ids to narrow to. Omitted returns every category
+   *   the deployment's registry declares. An unknown id is rejected by the
+   *   server with 400 rather than silently dropped, so a typo fails loudly.
+   */
+  async getCanonicalView(
+    ihsId: string | number,
+    include?: readonly string[],
+  ): Promise<CanonicalView> {
+    const id = this.validateId(ihsId)
+    return this.withAuth(async (headers) => {
+      const base = this.resolveUrl(LenderEndpoint.CANONICAL_VIEW, id)
+      // An EMPTY include is a caller bug the server rejects; sending it would
+      // be indistinguishable from omitting it here, so refuse it locally
+      // rather than turning it into "give me everything".
+      if (include && include.length === 0) {
+        throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
+      }
+      const url = include?.length ? `${base}?include=${encodeURIComponent(include.join(','))}` : base
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+        if (!response.data?.data) {
+          throw new LenderApiError(`Canonical view for ${ihsId} not found`, { statusCode: 404 })
+        }
+        return response.data.data as CanonicalView
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  /**
+   * SYS-3416 — the application record: the facility request, parties, workflow
+   * state and consent references. What the canonical view deliberately omits.
+   *
+   * A consumer migrating off v1 needs BOTH this and getCanonicalView; neither
+   * alone carries what the flat detail read did.
+   */
+  async getApplicationRecord(ihsId: string | number): Promise<ApplicationRecord> {
+    const id = this.validateId(ihsId)
+    return this.withAuth(async (headers) => {
+      const url = this.resolveUrl(LenderEndpoint.APPLICATION_RECORD, id)
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+        if (!response.data?.data) {
+          throw new LenderApiError(`Application record ${ihsId} not found`, { statusCode: 404 })
+        }
+        return response.data.data as ApplicationRecord
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }
