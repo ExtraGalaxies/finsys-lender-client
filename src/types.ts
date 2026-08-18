@@ -244,63 +244,36 @@ export interface ExtractionJobStatus {
  * not, and nothing in either payload signals which you hold.
  */
 
-/** One canonical value, with everything needed to judge it. */
-export interface CanonicalFieldEnvelope {
-  value: number | boolean | string
-  /** Present only when it can be attributed to this instance's run. */
-  confidence?: number
-  origin?: string
-  confidentiality: string
-}
-
-export interface CanonicalInstance {
-  /** '' for a single-cardinality category. */
-  instanceKey: string
-  adapterId: string
-  adapterVersion: number
-  runId?: number
-  observedAt?: string
-  fields: Record<string, CanonicalFieldEnvelope>
-}
-
-export interface CanonicalCategory {
-  /**
-   * From the producing adapter's manifest, and it describes ONE RECORD:
-   * `single` means at most one instance per application. It does NOT mean the
-   * subject has one value — see the note on CanonicalView.
-   */
-  cardinality?: 'single' | 'multi'
-  instances: CanonicalInstance[]
-}
-
-/**
- * THE SCOPE OF THIS RESPONSE IS ONE APPLICATION. Every instance below comes
- * from the record named by `ihsId`, which is why instances carry no
- * per-instance source reference — at this scope it would be a constant.
+/*
+ * SYS-3334: the five envelope types are OWNED BY @finsys/core and re-exported
+ * here. They describe the wire shape of a published API, and every consumer
+ * needs them — finhub through its own gateway, a bureau portal later — not
+ * only external lenders holding this SDK. Two declarations of one wire shape,
+ * drifting apart with nothing comparing them, is this estate's signature
+ * defect; so the shape is declared once, in the package that already owns the
+ * category registry and the field catalogue, and this SDK re-exports it.
  *
- * Do not write code that assumes this is interchangeable with a subject-scoped
- * view. That response would carry source attribution per instance and would
- * re-scope or omit `cardinality`; a consumer that read `single` as licence to
- * take instances[0] is correct here and wrong there.
+ * Note what 2.5.0 shipped: it DECLARED these interfaces in this file and never
+ * exported them from the index — `import type { CanonicalView } from
+ * '@finsys/lender-client'` was TS2305. A 2.5.0 consumer held a CanonicalView
+ * only as the unnamed return type of `getCanonicalView()`. 2.6.0 is the first
+ * release in which the names are importable; `tests/canonical-types-compat.
+ * test.ts` proves, both ways, that what such a consumer held is assignable to
+ * and from what core now declares.
  */
-export interface CanonicalView {
-  ihsId: number
-  categories: Record<string, CanonicalCategory>
-}
-
-/**
- * Where a v1 field lives on the canonical plane. Resolved with
- * `resolveCanonicalValue`, never by hand — the instance-selection rule is the
- * part consumers get subtly different from each other.
- */
-export interface CanonicalAddress {
-  category: string
-  field: string
-  /**
-   * Present: resolve to exactly this instance.
-   * Absent: latest by observedAt, which is what v1's flat mirror actually did.
-   */
-  instanceKey?: string
+import type {
+  CanonicalFieldEnvelope,
+  CanonicalInstance,
+  CanonicalCategory,
+  CanonicalView,
+  CanonicalAddress,
+} from '@finsys/core'
+export type {
+  CanonicalFieldEnvelope,
+  CanonicalInstance,
+  CanonicalCategory,
+  CanonicalView,
+  CanonicalAddress,
 }
 
 /** The application record — what v2 deliberately does not carry. */

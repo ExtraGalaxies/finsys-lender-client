@@ -9,6 +9,41 @@ versions are described by their GitHub Releases.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-18
+
+Additive. No method removed, no signature changed, no behavior altered — a
+consumer on 2.5.0 upgrades without touching anything. One new install-time
+dependency: `@finsys/core`.
+
+### Fixed
+
+- **The v2 envelope types are now importable by name (SYS-3334).** 2.5.0
+  *declared* `CanonicalView`, `CanonicalCategory`, `CanonicalInstance`,
+  `CanonicalFieldEnvelope`, `CanonicalAddress` — and `ApplicationRecord` — but
+  never exported them from the package index, so
+  `import type { CanonicalView } from '@finsys/lender-client'` was `TS2305`.
+  A consumer could hold one only as the unnamed return type of
+  `getCanonicalView()`, and had to spell `resolveCanonicalValue`'s address
+  argument as an anonymous literal. All six are exported by name from 2.6.0.
+
+### Changed
+
+- **The five `Canonical*` types are owned by `@finsys/core` and re-exported
+  here.** They describe the wire shape of a published API and every consumer
+  needs them — not only external lenders holding this SDK. Two declarations of
+  one wire shape drifting apart, with nothing comparing them, is the defect
+  this estate keeps re-finding; so the shape now lives once, in the package
+  that already owns the category registry, the field catalogue and the v1
+  migration map. `@finsys/core ^7.10.0` becomes a dependency of this package
+  for that reason (types only — nothing from core executes at runtime).
+
+  `tests/canonical-types-compat.test.ts` installs the published 2.5.0 under an
+  alias and proves, at compile time and in **both directions**, that what a
+  2.5.0 consumer held is assignable to and from what core now declares — the
+  old types derived from 2.5.0's own signatures, because that is precisely
+  what 2.5.0 published. Mutation-proven: a member made required, a member
+  dropped, and a member renamed in core's declarations each fail the suite.
+
 ## [2.5.0] - 2026-08-18
 
 Additive. No method removed, no signature changed, no behavior altered for

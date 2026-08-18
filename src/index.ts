@@ -32,5 +32,13 @@ export {
   type ExtractionJobStatus,
   type UpdateChannel,
   type UpdateFeedSas,
+  // SYS-3334: declared since 2.5.0, exported by name for the first time here.
+  // The five Canonical* types are @finsys/core's; this SDK re-exports them.
+  type CanonicalFieldEnvelope,
+  type CanonicalInstance,
+  type CanonicalCategory,
+  type CanonicalView,
+  type CanonicalAddress,
+  type ApplicationRecord,
 } from './types.js'
 export { resolveCanonicalValue, resolveCanonicalEnvelope } from './canonical.js'
