@@ -16,6 +16,9 @@ export enum LenderEndpoint {
   CONSENTS = 'consents',
   CONSENT_DEFINITIONS = 'consent_definitions',
   EXTRACTION_STATUS = 'extraction_status',
+  /** SYS-3416 — the Phase 5 read pair. See CanonicalView / ApplicationRecord. */
+  CANONICAL_VIEW = 'canonical_view',
+  APPLICATION_RECORD = 'application_record',
   INSTALLER_LATEST = 'installer_latest',
   INSTALLER_DOWNLOAD_URL = 'installer_download_url',
   INSTALLER_UPDATE_FEED = 'installer_update_feed',
@@ -225,4 +228,94 @@ export interface ExtractionJobStatus {
   attemptCount: number
   startedAt: string | null
   completedAt: string | null
+}
+
+/**
+ * SYS-3416 — the Phase 5 read pair.
+ *
+ * `getApplicationDetails` (v1) and `getCanonicalView` (v2) DO NOT MEAN THE SAME
+ * THING, and swapping one for the other is not a refactor:
+ *
+ *   v1 merges THIS LENDER'S pending edit overlay before returning, so a value
+ *   is the lender's current working value.
+ *   v2 returns the ATTESTED FACT — what a named adapter run observed.
+ *
+ * Both are defensible inputs to a decision. Switching between them silently is
+ * not, and nothing in either payload signals which you hold.
+ */
+
+/** One canonical value, with everything needed to judge it. */
+export interface CanonicalFieldEnvelope {
+  value: number | boolean | string
+  /** Present only when it can be attributed to this instance's run. */
+  confidence?: number
+  origin?: string
+  confidentiality: string
+}
+
+export interface CanonicalInstance {
+  /** '' for a single-cardinality category. */
+  instanceKey: string
+  adapterId: string
+  adapterVersion: number
+  runId?: number
+  observedAt?: string
+  fields: Record<string, CanonicalFieldEnvelope>
+}
+
+export interface CanonicalCategory {
+  /**
+   * From the producing adapter's manifest, and it describes ONE RECORD:
+   * `single` means at most one instance per application. It does NOT mean the
+   * subject has one value — see the note on CanonicalView.
+   */
+  cardinality?: 'single' | 'multi'
+  instances: CanonicalInstance[]
+}
+
+/**
+ * THE SCOPE OF THIS RESPONSE IS ONE APPLICATION. Every instance below comes
+ * from the record named by `ihsId`, which is why instances carry no
+ * per-instance source reference — at this scope it would be a constant.
+ *
+ * Do not write code that assumes this is interchangeable with a subject-scoped
+ * view. That response would carry source attribution per instance and would
+ * re-scope or omit `cardinality`; a consumer that read `single` as licence to
+ * take instances[0] is correct here and wrong there.
+ */
+export interface CanonicalView {
+  ihsId: number
+  categories: Record<string, CanonicalCategory>
+}
+
+/**
+ * Where a v1 field lives on the canonical plane. Resolved with
+ * `resolveCanonicalValue`, never by hand — the instance-selection rule is the
+ * part consumers get subtly different from each other.
+ */
+export interface CanonicalAddress {
+  category: string
+  field: string
+  /**
+   * Present: resolve to exactly this instance.
+   * Absent: latest by observedAt, which is what v1's flat mirror actually did.
+   */
+  instanceKey?: string
+}
+
+/** The application record — what v2 deliberately does not carry. */
+export interface ApplicationRecord {
+  applicationId: number
+  status: string | null
+  statusDescription: string | null
+  parties: Record<string, unknown>
+  facility: Record<string, unknown>
+  system: Record<string, unknown>
+  consents: Array<{
+    eventId: number | null
+    definitionId: number | null
+    version: number | null
+    granted: boolean | null
+    capturedAt: string | null
+  }>
 }

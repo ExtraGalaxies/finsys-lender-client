@@ -33,3 +33,4 @@ export {
   type UpdateChannel,
   type UpdateFeedSas,
 } from './types.js'
+export { resolveCanonicalValue, resolveCanonicalEnvelope } from './canonical.js'
