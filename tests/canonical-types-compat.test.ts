@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   resolveCanonicalValue as resolveValue250,
   resolveCanonicalEnvelope as resolveEnvelope250,
@@ -36,7 +39,28 @@ import {
  * A member core ADDS as optional passes both — that is additive and allowed.
  * These are compile-time pins: `npm test` runs tsc over this file first, and a
  * failed assignment fails the suite before node ever runs it.
+ *
+ * THE ALIAS MUST STAY AT 2.5.0. It is the last release that declared these
+ * types locally, so it is the only meaningful "before". Bump it to 2.6.0 or
+ * later and the alias resolves to a package that itself re-exports core —
+ * every pin becomes `core extends core` and the whole file passes
+ * tautologically. The runtime test below asserts the alias's version so that
+ * bump fails loudly instead of quietly hollowing this file out.
  */
+
+// The alias package's own manifest. Its `exports` map is `import`-only and
+// blocks `.../package.json`, so resolve the ESM entry and walk up to the
+// nearest package.json.
+const pkg250 = (() => {
+  let dir = dirname(fileURLToPath(import.meta.resolve('lender-client-2.5.0')))
+  for (;;) {
+    const candidate = join(dir, 'package.json')
+    if (existsSync(candidate)) return JSON.parse(readFileSync(candidate, 'utf8')) as { name: string; version: string }
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error('no package.json above the resolved lender-client-2.5.0 entry')
+    dir = parent
+  }
+})()
 
 type View250 = Awaited<ReturnType<LenderClient250['getCanonicalView']>>
 type Address250 = Parameters<typeof resolveValue250>[1]
@@ -67,6 +91,25 @@ type _e2 = Assert<Assignable<CanonicalFieldEnvelope, Envelope250>>
 type _i2 = Assert<Assignable<CanonicalInstance, Instance250>>
 type _c2 = Assert<Assignable<CanonicalCategory, Category250>>
 type _r2 = Assert<Assignable<ApplicationRecord, Record250>>
+// Member SETS, both ways. Structural assignability alone is blind to OPTIONAL
+// members: `{a: 1}` is assignable to `{a: 1; b?: 2}` and back, so core could
+// drop or rename `confidence?`, `origin?` or `runId?` — the provenance fields a
+// consumer uses to decide whether to trust a value — with every pin above still
+// green. Review found exactly that gap. `keyof` catches it: a dropped optional
+// member is a missing key in one direction, a renamed one is missing in both.
+type _kv1 = Assert<Assignable<keyof View250, keyof CanonicalView>>
+type _kv2 = Assert<Assignable<keyof CanonicalView, keyof View250>>
+type _ka1 = Assert<Assignable<keyof Address250, keyof CanonicalAddress>>
+type _ka2 = Assert<Assignable<keyof CanonicalAddress, keyof Address250>>
+type _ke1 = Assert<Assignable<keyof Envelope250, keyof CanonicalFieldEnvelope>>
+type _ke2 = Assert<Assignable<keyof CanonicalFieldEnvelope, keyof Envelope250>>
+type _ki1 = Assert<Assignable<keyof Instance250, keyof CanonicalInstance>>
+type _ki2 = Assert<Assignable<keyof CanonicalInstance, keyof Instance250>>
+type _kc1 = Assert<Assignable<keyof Category250, keyof CanonicalCategory>>
+type _kc2 = Assert<Assignable<keyof CanonicalCategory, keyof Category250>>
+type _kr1 = Assert<Assignable<keyof Record250, keyof ApplicationRecord>>
+type _kr2 = Assert<Assignable<keyof ApplicationRecord, keyof Record250>>
+
 // And the client's own v2 signature still returns the (now core-owned) type,
 // exactly — not merely something assignable to it.
 type _p = Assert<Assignable<Awaited<ReturnType<LenderClient['getCanonicalView']>>, CanonicalView>>
@@ -101,6 +144,12 @@ const fixture: CanonicalView = {
     },
   },
 }
+
+test('the compat baseline is the published 2.5.0 — the last release that declared these types locally', () => {
+  // See the docstring: a later baseline makes every pin above `core extends core`.
+  assert.equal(pkg250.name, '@finsys/lender-client')
+  assert.equal(pkg250.version, '2.5.0')
+})
 
 test('the same view resolves identically through the 2.5.0 and current resolvers', () => {
   const explicit = { category: 'applicant-contact', field: 'contactValue', instanceKey: 'mobile' }

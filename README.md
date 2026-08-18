@@ -108,8 +108,36 @@ try {
 | `downloadFile(ihsId, documentId)` | `Promise<FileDownload>` |
 | `uploadDocument(ihsId, file)` | `Promise<UploadResult>` |
 | `getPrograms()` | `Promise<Program[]>` |
+| `getCanonicalView(ihsId, include?)` | `Promise<CanonicalView>` — the v2 read: canonical facts, each in a provenance envelope. **Not** a drop-in for `getApplicationDetails`: v1 merges *your* pending edit overlay, v2 returns the attested fact. |
+| `getApplicationRecord(ihsId)` | `Promise<ApplicationRecord>` — the application record (status, facility, parties) that v2 deliberately does not carry. A consumer migrating off v1 needs both. |
 | `isAuthenticated()` | `boolean` |
 | `getEnvironment()` | `LenderEnvironment` |
+
+### Reading a canonical view
+
+Resolve values with the shared resolver, never by hand — instance selection is
+the part consumers get subtly different from each other, and a wrongly chosen
+instance is a plausible value rather than an error.
+
+| Function | Returns |
+|---|---|
+| `resolveCanonicalValue(view, address)` | `number \| boolean \| string \| undefined` |
+| `resolveCanonicalEnvelope(view, address)` | `CanonicalFieldEnvelope \| undefined` — the value with its provenance |
+
+```typescript
+import type { CanonicalView, CanonicalAddress } from '@finsys/lender-client'
+import { resolveCanonicalValue } from '@finsys/lender-client'
+
+const view: CanonicalView = await client.getCanonicalView(ihsId)
+const address: CanonicalAddress = { category: 'applicant-contact', field: 'contactValue', instanceKey: 'mobile' }
+const mobile = resolveCanonicalValue(view, address)
+```
+
+The envelope types — `CanonicalView`, `CanonicalCategory`, `CanonicalInstance`,
+`CanonicalFieldEnvelope`, `CanonicalAddress` — are declared in `@finsys/core`
+and re-exported here; import them from either package. (2.5.0 declared them but
+did not export the names; 2.6.0 is the first release in which they are
+importable.)
 
 ## Data Handling
 

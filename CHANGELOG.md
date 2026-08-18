@@ -11,9 +11,12 @@ versions are described by their GitHub Releases.
 
 ## [2.6.0] - 2026-08-18
 
-Additive. No method removed, no signature changed, no behavior altered — a
-consumer on 2.5.0 upgrades without touching anything. One new install-time
-dependency: `@finsys/core`.
+Additive. No method removed, no signature changed, no behavior altered. New
+install-time dependency: `@finsys/core` — which brings its own runtime tree
+(`zod`, `ajv`, `ajv-formats`, `semver` and their transitive deps; nine packages
+in all). Nothing from any of them executes in this SDK: the import is
+`import type` and is erased at build. Stated here because a public package's
+dependency tree is the consumer's audit surface.
 
 ### Fixed
 
@@ -43,8 +46,14 @@ dependency: `@finsys/core`.
   alias and proves, at compile time and in **both directions**, that what a
   2.5.0 consumer held is assignable to and from what core now declares — the
   old types derived from 2.5.0's own signatures, because that is precisely
-  what 2.5.0 published. Mutation-proven: a member made required, a member
-  dropped, and a member renamed in core's declarations each fail the suite.
+  what 2.5.0 published. Two layers: structural assignability both ways, and
+  `keyof` both ways — the second because structural assignability alone is
+  blind to OPTIONAL members, and `confidence?`/`origin?`/`runId?` are the
+  provenance fields a consumer uses to decide whether to trust a value.
+  Mutation-proven against core's installed declarations: a member made
+  required, dropped, renamed, widened or narrowed — required or optional —
+  each fails the suite. The alias baseline is pinned to 2.5.0 with a runtime
+  guard, because a later baseline would make every pin `core extends core`.
 
 ## [2.5.0] - 2026-08-18
 
