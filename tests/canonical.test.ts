@@ -109,6 +109,32 @@ test('an absent category, field or instance resolves to undefined, not a throw',
   // "withheld" would itself disclose that the data exists.
 })
 
+test('a tie in observedAt resolves to the FIRST instance in array order', () => {
+  // Undocumented until now: the comparison is strict `>`, so an equal-
+  // timestamp candidate never displaces the one already held. Pinning array
+  // order, not just "a" tie-break, so a future change to the comparison is
+  // caught here rather than discovered downstream.
+  const v = view([
+    inst('first', 'A', '2026-01-01T00:00:00.000Z'),
+    inst('second', 'B', '2026-01-01T00:00:00.000Z'),
+  ])
+  assert.equal(
+    resolveCanonicalValue(v, { category: 'applicant-contact', field: 'contactValue' }),
+    'A',
+  )
+})
+
+test('reversing the tied instances flips the winner — it is array order, not instanceKey', () => {
+  const v = view([
+    inst('second', 'B', '2026-01-01T00:00:00.000Z'),
+    inst('first', 'A', '2026-01-01T00:00:00.000Z'),
+  ])
+  assert.equal(
+    resolveCanonicalValue(v, { category: 'applicant-contact', field: 'contactValue' }),
+    'B',
+  )
+})
+
 test('the envelope form keeps provenance around the value', () => {
   const v = view([inst('mobile', '+60111111111', '2026-01-01T00:00:00.000Z')])
   const env = resolveCanonicalEnvelope(v, {

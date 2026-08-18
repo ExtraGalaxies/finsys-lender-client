@@ -30,6 +30,25 @@ two envelope members below.
   is exported. A migrating client's edit-mode screens use this; its scoring
   decides deliberately which of the two it wants.
 
+### Fixed (candidate-only — none of these ever shipped)
+
+- **`overlay` values other than `'mine'` were silently dropped** — a JS caller
+  passing `'MINE'`, `'true'`, `true`, `1`, `''` got a request with no overlay
+  param and a facts-only view while believing it held its staged edits, the
+  exact confusion this option exists to end. Now rejected locally with a 400
+  `LenderApiError` before any HTTP call, the same precedent as `include: []`.
+- **`include` ids were joined and then encoded**, so `['a,b','c']` and
+  `['a','b','c']` were byte-identical on the wire. Each id is encoded before
+  joining.
+- **A trailing slash on an `endpointOverrides` value produced `//`** in the
+  path (`/v2/ihs//42`). Normalized.
+- Tied `observedAt` resolves to the first instance in array order; now
+  documented and pinned.
+- New `tests/lender-client-v2.test.ts`: the first HTTP-level tests this
+  package has had — a local `node:http` server captures the exact request for
+  both v2 methods (URL composition, empty-include in both forms, overlay
+  validation, override normalization, and 401 → one re-login → one retry).
+
 ## [2.6.0] - 2026-08-18
 
 Additive. No method removed, no signature changed, no behavior altered. New

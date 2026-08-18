@@ -27,7 +27,6 @@ const client = new LenderClient({
   credentials: {
     clientId: 'your-client-id',
     clientSecret: 'your-client-secret',
-    subscriptionKey: 'your-subscription-key',
   },
 })
 
@@ -108,7 +107,7 @@ try {
 | `downloadFile(ihsId, documentId)` | `Promise<FileDownload>` |
 | `uploadDocument(ihsId, file)` | `Promise<UploadResult>` |
 | `getPrograms()` | `Promise<Program[]>` |
-| `getCanonicalView(ihsId, include?)` | `Promise<CanonicalView>` — the v2 read: canonical facts, each in a provenance envelope. **Not** a drop-in for `getApplicationDetails`: v1 merges *your* pending edit overlay, v2 returns the attested fact. |
+| `getCanonicalView(ihsId, options?)` | `Promise<CanonicalView>` — the v2 read: canonical facts, each in a provenance envelope. `options` is `{ include?: string[], overlay?: 'mine' }` (a bare `string[]` is still accepted as `include`). **Not** a drop-in for `getApplicationDetails`: v1 merges *your* pending edit overlay silently; v2 returns the attested facts, and projects your staged edits only when you pass `overlay: 'mine'` — the response then carries `overlay: {…}` and each overlaid field its `originalValue`. Any other `overlay` value is rejected locally (400), never silently dropped. |
 | `getApplicationRecord(ihsId)` | `Promise<ApplicationRecord>` — the application record (status, facility, parties) that v2 deliberately does not carry. A consumer migrating off v1 needs both. |
 | `isAuthenticated()` | `boolean` |
 | `getEnvironment()` | `LenderEnvironment` |

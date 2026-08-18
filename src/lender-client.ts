@@ -54,7 +54,10 @@ export class LenderClient {
   private resolveUrl(endpoint: LenderEndpoint, suffix?: string): string {
     const override = this.config.endpointOverrides?.[endpoint]
     if (override) {
-      return suffix ? `${override}/${suffix}` : override
+      // A caller-supplied override ending in '/' would otherwise produce a
+      // double slash once the id suffix is appended (`/v2/ihs//42`).
+      const normalized = override.replace(/\/+$/, '')
+      return suffix ? `${normalized}/${suffix}` : normalized
     }
     const base = BASE_URLS[this.config.environment]
     const path = ENDPOINT_PATHS[endpoint]
@@ -227,7 +230,12 @@ export class LenderClient {
    *   `originalValue`; the view carries `overlay: {lenderId, applied, …}` so
    *   the payload SAYS which projection you hold. Without it, the view is
    *   facts-only and identical for every lender. A bare array is still
-   *   accepted as `include`, for 2.5.0/2.6.0 callers.
+   *   accepted as `include`, for 2.5.0/2.6.0 callers. An `overlay` value
+   *   other than `'mine'` (a typo, a stringified boolean, anything a
+   *   non-TS caller might pass) is rejected locally with a 400
+   *   `LenderApiError` before any HTTP call — silently dropping it would
+   *   send the request with no overlay param at all, and the caller would
+   *   believe they held their staged edits when they held facts-only.
    */
   async getCanonicalView(
     ihsId: string | number,
@@ -238,16 +246,29 @@ export class LenderClient {
       ? { include: options as readonly string[] }
       : ((options as CanonicalViewOptions | undefined) ?? {})
     const include = opts.include
+    // An EMPTY include is a caller bug the server rejects; sending it would
+    // be indistinguishable from omitting it here, so refuse it locally
+    // rather than turning it into "give me everything". Checked before any
+    // HTTP call — including before login — so a bad call never reaches the
+    // network at all.
+    if (include && include.length === 0) {
+      throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
+    }
+    // overlay must be exactly 'mine' when supplied. Anything else would
+    // otherwise be silently dropped by the `=== 'mine'` check below, sending
+    // the request with no overlay param and leaving the caller believing
+    // they hold their staged edits. Same locally-before-HTTP precedent as
+    // the include check above.
+    if (opts.overlay !== undefined && opts.overlay !== 'mine') {
+      throw new LenderApiError('overlay must be "mine" when supplied', { statusCode: 400 })
+    }
     return this.withAuth(async (headers) => {
       const base = this.resolveUrl(LenderEndpoint.CANONICAL_VIEW, id)
-      // An EMPTY include is a caller bug the server rejects; sending it would
-      // be indistinguishable from omitting it here, so refuse it locally
-      // rather than turning it into "give me everything".
-      if (include && include.length === 0) {
-        throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
-      }
       const params: string[] = []
-      if (include?.length) params.push(`include=${encodeURIComponent(include.join(','))}`)
+      // Each id is encoded BEFORE joining, not after — encoding the joined
+      // string would make an id containing a literal comma indistinguishable
+      // from two separate ids on the wire.
+      if (include?.length) params.push(`include=${include.map(encodeURIComponent).join(',')}`)
       if (opts.overlay === 'mine') params.push('overlay=mine')
       const url = params.length ? `${base}?${params.join('&')}` : base
 
