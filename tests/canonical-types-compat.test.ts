@@ -91,24 +91,24 @@ type _e2 = Assert<Assignable<CanonicalFieldEnvelope, Envelope250>>
 type _i2 = Assert<Assignable<CanonicalInstance, Instance250>>
 type _c2 = Assert<Assignable<CanonicalCategory, Category250>>
 type _r2 = Assert<Assignable<ApplicationRecord, Record250>>
-// Member SETS, both ways. Structural assignability alone is blind to OPTIONAL
+// Member SETS, old ⊆ new. Structural assignability alone is blind to OPTIONAL
 // members: `{a: 1}` is assignable to `{a: 1; b?: 2}` and back, so core could
 // drop or rename `confidence?`, `origin?` or `runId?` — the provenance fields a
 // consumer uses to decide whether to trust a value — with every pin above still
-// green. Review found exactly that gap. `keyof` catches it: a dropped optional
-// member is a missing key in one direction, a renamed one is missing in both.
+// green. Review found exactly that gap. `keyof Old ⊆ keyof New` catches it: a
+// dropped optional member is a missing key, a renamed one too.
+//
+// ONE direction, deliberately. `keyof New ⊆ keyof Old` would forbid core from
+// ADDING an optional member, and core's stated contract for these five types
+// (src/canonical-view.ts, 8.0.0) is that an added optional member is a MINOR.
+// 8.1.0 did exactly that (`originalValue?`, `overlay?`, SYS-3415) and this
+// pin went red until it said what the contract says.
 type _kv1 = Assert<Assignable<keyof View250, keyof CanonicalView>>
-type _kv2 = Assert<Assignable<keyof CanonicalView, keyof View250>>
 type _ka1 = Assert<Assignable<keyof Address250, keyof CanonicalAddress>>
-type _ka2 = Assert<Assignable<keyof CanonicalAddress, keyof Address250>>
 type _ke1 = Assert<Assignable<keyof Envelope250, keyof CanonicalFieldEnvelope>>
-type _ke2 = Assert<Assignable<keyof CanonicalFieldEnvelope, keyof Envelope250>>
 type _ki1 = Assert<Assignable<keyof Instance250, keyof CanonicalInstance>>
-type _ki2 = Assert<Assignable<keyof CanonicalInstance, keyof Instance250>>
 type _kc1 = Assert<Assignable<keyof Category250, keyof CanonicalCategory>>
-type _kc2 = Assert<Assignable<keyof CanonicalCategory, keyof Category250>>
 type _kr1 = Assert<Assignable<keyof Record250, keyof ApplicationRecord>>
-type _kr2 = Assert<Assignable<keyof ApplicationRecord, keyof Record250>>
 
 // And the client's own v2 signature still returns the (now core-owned) type,
 // exactly — not merely something assignable to it.

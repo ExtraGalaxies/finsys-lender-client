@@ -40,5 +40,6 @@ export {
   type CanonicalView,
   type CanonicalAddress,
   type ApplicationRecord,
+  type CanonicalViewOptions,
 } from './types.js'
 export { resolveCanonicalValue, resolveCanonicalEnvelope } from './canonical.js'

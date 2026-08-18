@@ -9,6 +9,27 @@ versions are described by their GitHub Releases.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-18
+
+Additive. No method removed, no signature narrowed — a consumer on 2.6.0
+upgrades without touching anything. Depends on `@finsys/core ^8.1.0` for the
+two envelope members below.
+
+### Added
+
+- **`getCanonicalView(ihsId, { include?, overlay?: 'mine' })` (SYS-3415).**
+  The bare-array form is still accepted as `include`. `overlay: 'mine'`
+  projects THIS lender's own staged, uncommitted field edits onto the view —
+  what `getApplicationDetails` (v1) always did silently, and what v2 does only
+  when asked. An overlaid field carries the staged value as `value`,
+  `origin: 'manual'`, and the attested value as `originalValue`; the view
+  carries `overlay: {lenderId, applied, updatedAt, unprojected[]}`, so the
+  payload SAYS which projection you hold — the gap 2.5.0's notes named.
+  Without it the view is facts-only and identical for every lender: another
+  lender in the same program never sees your staged edit. `CanonicalViewOptions`
+  is exported. A migrating client's edit-mode screens use this; its scoring
+  decides deliberately which of the two it wants.
+
 ## [2.6.0] - 2026-08-18
 
 Additive. No method removed, no signature changed, no behavior altered. New

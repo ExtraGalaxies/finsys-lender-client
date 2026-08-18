@@ -15,6 +15,7 @@ import {
   type CachedToken,
   type Application,
   type CanonicalView,
+  type CanonicalViewOptions,
   type ApplicationRecord,
   type ApplicationListFilter,
   type ApplicationListResult,
@@ -216,15 +217,27 @@ export class LenderClient {
    *
    * The response is scoped to ONE application — see CanonicalView.
    *
-   * @param include Category ids to narrow to. Omitted returns every category
-   *   the deployment's registry declares. An unknown id is rejected by the
-   *   server with 400 rather than silently dropped, so a typo fails loudly.
+   * @param options `include`: category ids to narrow to — omitted returns every
+   *   category the deployment's registry declares; an unknown id is rejected
+   *   by the server with 400 rather than silently dropped, so a typo fails
+   *   loudly. `overlay: 'mine'` (SYS-3415, 2.7.0): project THIS lender's own
+   *   staged, uncommitted field edits onto the view — the thing v1 did for
+   *   you and v2 does only when asked. An overlaid field carries the staged
+   *   value as `value`, `origin: 'manual'`, and the attested value as
+   *   `originalValue`; the view carries `overlay: {lenderId, applied, …}` so
+   *   the payload SAYS which projection you hold. Without it, the view is
+   *   facts-only and identical for every lender. A bare array is still
+   *   accepted as `include`, for 2.5.0/2.6.0 callers.
    */
   async getCanonicalView(
     ihsId: string | number,
-    include?: readonly string[],
+    options?: readonly string[] | CanonicalViewOptions,
   ): Promise<CanonicalView> {
     const id = this.validateId(ihsId)
+    const opts: CanonicalViewOptions = Array.isArray(options)
+      ? { include: options as readonly string[] }
+      : ((options as CanonicalViewOptions | undefined) ?? {})
+    const include = opts.include
     return this.withAuth(async (headers) => {
       const base = this.resolveUrl(LenderEndpoint.CANONICAL_VIEW, id)
       // An EMPTY include is a caller bug the server rejects; sending it would
@@ -233,7 +246,10 @@ export class LenderClient {
       if (include && include.length === 0) {
         throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
       }
-      const url = include?.length ? `${base}?include=${encodeURIComponent(include.join(','))}` : base
+      const params: string[] = []
+      if (include?.length) params.push(`include=${encodeURIComponent(include.join(','))}`)
+      if (opts.overlay === 'mine') params.push('overlay=mine')
+      const url = params.length ? `${base}?${params.join('&')}` : base
 
       try {
         const client = this.createRetryClient()

@@ -278,6 +278,15 @@ export type {
   CanonicalAddress,
 }
 
+/**
+ * SYS-3415 (2.7.0): options for `getCanonicalView`. `overlay: 'mine'` projects
+ * the calling lender's own staged edits; see the method's doc.
+ */
+export interface CanonicalViewOptions {
+  include?: readonly string[]
+  overlay?: 'mine'
+}
+
 /** The application record — what v2 deliberately does not carry. */
 export interface ApplicationRecord {
   applicationId: number
