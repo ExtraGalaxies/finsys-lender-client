@@ -25,6 +25,8 @@ dependency: `@finsys/core`.
   A consumer could hold one only as the unnamed return type of
   `getCanonicalView()`, and had to spell `resolveCanonicalValue`'s address
   argument as an anonymous literal. All six are exported by name from 2.6.0.
+  (`ApplicationRecord` stays declared in this package — it is the SDK's
+  application record, not part of core's envelope vocabulary.)
 
 ### Changed
 
