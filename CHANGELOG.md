@@ -39,8 +39,13 @@ dependency tree is the consumer's audit surface.
   one wire shape drifting apart, with nothing comparing them, is the defect
   this estate keeps re-finding; so the shape now lives once, in the package
   that already owns the category registry, the field catalogue and the v1
-  migration map. `@finsys/core ^7.10.0` becomes a dependency of this package
+  migration map. `@finsys/core ^8.0.0` becomes a dependency of this package
   for that reason (types only — nothing from core executes at runtime).
+  `^8.0.0`, not `^7.10.0`: 7.x's root declaration file re-exported types from
+  an optional peer, which failed typechecking for any consumer of THIS package
+  on tsc's default `skipLibCheck: false` — found by this release's review and
+  fixed in core 8.0.0 (SYS-3420). Consumers should not have to install
+  `survey-core` to typecheck a lender SDK.
 
   `tests/canonical-types-compat.test.ts` installs the published 2.5.0 under an
   alias and proves, at compile time and in **both directions**, that what a
