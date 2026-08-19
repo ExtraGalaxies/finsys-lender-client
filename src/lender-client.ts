@@ -265,9 +265,12 @@ export class LenderClient {
     return this.withAuth(async (headers) => {
       const base = this.resolveUrl(LenderEndpoint.CANONICAL_VIEW, id)
       const params: string[] = []
-      // Each id is encoded BEFORE joining, not after — encoding the joined
-      // string would make an id containing a literal comma indistinguishable
-      // from two separate ids on the wire.
+      // Each id is encoded BEFORE joining, so a reserved character in an id
+      // (`&`, `#`, `%`, space) cannot corrupt the query string. This is a
+      // property of the RAW request line only: the server percent-decodes the
+      // value before splitting on `,`, so a comma-bearing id would still read
+      // as two ids there. Category ids are kebab-case registry slugs and never
+      // contain a comma, so nothing depends on that case.
       if (include?.length) params.push(`include=${include.map(encodeURIComponent).join(',')}`)
       if (opts.overlay === 'mine') params.push('overlay=mine')
       const url = params.length ? `${base}?${params.join('&')}` : base

@@ -37,9 +37,13 @@ two envelope members below.
   param and a facts-only view while believing it held its staged edits, the
   exact confusion this option exists to end. Now rejected locally with a 400
   `LenderApiError` before any HTTP call, the same precedent as `include: []`.
-- **`include` ids were joined and then encoded**, so `['a,b','c']` and
-  `['a','b','c']` were byte-identical on the wire. Each id is encoded before
-  joining.
+- **`include` ids were joined and then encoded.** Each id is now encoded
+  before joining, so a reserved character in an id (`&`, `#`, `%`, space)
+  cannot corrupt the query string. Note the limit of that: it holds on the
+  RAW request line only — the server percent-decodes the value before
+  splitting on `,`, so a comma-bearing id would still read as two ids
+  server-side. Category ids are kebab-case registry slugs and never contain a
+  comma, so no real request is affected either way.
 - **A trailing slash on an `endpointOverrides` value produced `//`** in the
   path (`/v2/ihs//42`). Normalized.
 - Tied `observedAt` resolves to the first instance in array order; now

@@ -25,8 +25,11 @@ import {
  * Three defects found in a pre-release sweep of this candidate are pinned
  * here alongside the new-method coverage:
  *   1. `overlay` silently dropped for any value but `'mine'`.
- *   2. `include` ids joined then encoded, making a comma-bearing id
- *      indistinguishable from two separate ids on the wire.
+ *   2. `include` ids joined then encoded — a reserved character in an id
+ *      could corrupt the query string. (Per-id encoding is a raw-request-line
+ *      property: the server decodes before splitting on `,`, and category ids
+ *      never contain a comma, so this pins the bytes sent, not a server-side
+ *      guarantee.)
  *   3. `resolveUrl` producing `//` when an `endpointOverrides` value ends in
  *      `/`.
  */
@@ -167,7 +170,7 @@ test('{include: ["a","b"], overlay: "mine"} produces the exact URL …/v2/ihs/7?
   }
 })
 
-test('an id containing a comma is encoded before joining — distinguishable from two separate ids on the wire', async () => {
+test('each include id is encoded before joining — the raw request line carries a%2Cb,c, not a,b,c (bytes sent; the server decodes before splitting)', async () => {
   const requests: string[] = []
   const { port, close } = await startServer((req, res) => {
     if (req.method === 'POST' && req.url === '/login') return loginOk(res)
@@ -183,7 +186,7 @@ test('an id containing a comma is encoded before joining — distinguishable fro
     assert.equal(requests.length, 2)
     assert.equal(requests[0], '/v2/ihs/7?include=a%2Cb,c')
     assert.equal(requests[1], '/v2/ihs/7?include=a,b,c')
-    assert.notEqual(requests[0], requests[1], 'the two id lists must not be byte-identical on the wire')
+    assert.notEqual(requests[0], requests[1], 'the two id lists must not be byte-identical on the raw request line')
   } finally {
     await close()
   }
