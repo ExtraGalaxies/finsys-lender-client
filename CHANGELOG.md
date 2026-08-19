@@ -9,6 +9,50 @@ versions are described by their GitHub Releases.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-18
+
+Additive. No method removed, no signature narrowed — a consumer on 2.6.0
+upgrades without touching anything. Depends on `@finsys/core ^8.1.0` for the
+two envelope members below.
+
+### Added
+
+- **`getCanonicalView(ihsId, { include?, overlay?: 'mine' })` (SYS-3415).**
+  The bare-array form is still accepted as `include`. `overlay: 'mine'`
+  projects THIS lender's own staged, uncommitted field edits onto the view —
+  what `getApplicationDetails` (v1) always did silently, and what v2 does only
+  when asked. An overlaid field carries the staged value as `value`,
+  `origin: 'manual'`, and the attested value as `originalValue`; the view
+  carries `overlay: {lenderId, applied, updatedAt, unprojected[]}`, so the
+  payload SAYS which projection you hold — the gap 2.5.0's notes named.
+  Without it the view is facts-only and identical for every lender: another
+  lender in the same program never sees your staged edit. `CanonicalViewOptions`
+  is exported. A migrating client's edit-mode screens use this; its scoring
+  decides deliberately which of the two it wants.
+
+### Fixed (candidate-only — none of these ever shipped)
+
+- **`overlay` values other than `'mine'` were silently dropped** — a JS caller
+  passing `'MINE'`, `'true'`, `true`, `1`, `''` got a request with no overlay
+  param and a facts-only view while believing it held its staged edits, the
+  exact confusion this option exists to end. Now rejected locally with a 400
+  `LenderApiError` before any HTTP call, the same precedent as `include: []`.
+- **`include` ids were joined and then encoded.** Each id is now encoded
+  before joining, so a reserved character in an id (`&`, `#`, `%`, space)
+  cannot corrupt the query string. Note the limit of that: it holds on the
+  RAW request line only — the server percent-decodes the value before
+  splitting on `,`, so a comma-bearing id would still read as two ids
+  server-side. Category ids are kebab-case registry slugs and never contain a
+  comma, so no real request is affected either way.
+- **A trailing slash on an `endpointOverrides` value produced `//`** in the
+  path (`/v2/ihs//42`). Normalized.
+- Tied `observedAt` resolves to the first instance in array order; now
+  documented and pinned.
+- New `tests/lender-client-v2.test.ts`: the first HTTP-level tests this
+  package has had — a local `node:http` server captures the exact request for
+  both v2 methods (URL composition, empty-include in both forms, overlay
+  validation, override normalization, and 401 → one re-login → one retry).
+
 ## [2.6.0] - 2026-08-18
 
 Additive. No method removed, no signature changed, no behavior altered. New

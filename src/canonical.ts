@@ -58,6 +58,12 @@ export function resolveCanonicalEnvelope(view: CanonicalView, address: Canonical
  *
  * Comparison is lexicographic on the ISO string, which is correct only for
  * Z-suffixed UTC — which is what the API emits.
+ *
+ * A tie in observedAt resolves to the FIRST instance in array order: the
+ * comparison is strict `>`, so a later candidate with an equal timestamp
+ * never displaces the one already held. This is undocumented behavior being
+ * pinned, not a new design choice — callers relying on array order for a tie
+ * should know it before it changes under them.
  */
 function latestByObservedAt(instances: CanonicalInstance[]): CanonicalInstance | undefined {
   let best: CanonicalInstance | undefined

@@ -15,6 +15,7 @@ import {
   type CachedToken,
   type Application,
   type CanonicalView,
+  type CanonicalViewOptions,
   type ApplicationRecord,
   type ApplicationListFilter,
   type ApplicationListResult,
@@ -53,7 +54,10 @@ export class LenderClient {
   private resolveUrl(endpoint: LenderEndpoint, suffix?: string): string {
     const override = this.config.endpointOverrides?.[endpoint]
     if (override) {
-      return suffix ? `${override}/${suffix}` : override
+      // A caller-supplied override ending in '/' would otherwise produce a
+      // double slash once the id suffix is appended (`/v2/ihs//42`).
+      const normalized = override.replace(/\/+$/, '')
+      return suffix ? `${normalized}/${suffix}` : normalized
     }
     const base = BASE_URLS[this.config.environment]
     const path = ENDPOINT_PATHS[endpoint]
@@ -216,24 +220,60 @@ export class LenderClient {
    *
    * The response is scoped to ONE application — see CanonicalView.
    *
-   * @param include Category ids to narrow to. Omitted returns every category
-   *   the deployment's registry declares. An unknown id is rejected by the
-   *   server with 400 rather than silently dropped, so a typo fails loudly.
+   * @param options `include`: category ids to narrow to — omitted returns every
+   *   category the deployment's registry declares; an unknown id is rejected
+   *   by the server with 400 rather than silently dropped, so a typo fails
+   *   loudly. `overlay: 'mine'` (SYS-3415, 2.7.0): project THIS lender's own
+   *   staged, uncommitted field edits onto the view — the thing v1 did for
+   *   you and v2 does only when asked. An overlaid field carries the staged
+   *   value as `value`, `origin: 'manual'`, and the attested value as
+   *   `originalValue`; the view carries `overlay: {lenderId, applied, …}` so
+   *   the payload SAYS which projection you hold. Without it, the view is
+   *   facts-only and identical for every lender. A bare array is still
+   *   accepted as `include`, for 2.5.0/2.6.0 callers. An `overlay` value
+   *   other than `'mine'` (a typo, a stringified boolean, anything a
+   *   non-TS caller might pass) is rejected locally with a 400
+   *   `LenderApiError` before any HTTP call — silently dropping it would
+   *   send the request with no overlay param at all, and the caller would
+   *   believe they held their staged edits when they held facts-only.
    */
   async getCanonicalView(
     ihsId: string | number,
-    include?: readonly string[],
+    options?: readonly string[] | CanonicalViewOptions,
   ): Promise<CanonicalView> {
     const id = this.validateId(ihsId)
+    const opts: CanonicalViewOptions = Array.isArray(options)
+      ? { include: options as readonly string[] }
+      : ((options as CanonicalViewOptions | undefined) ?? {})
+    const include = opts.include
+    // An EMPTY include is a caller bug the server rejects; sending it would
+    // be indistinguishable from omitting it here, so refuse it locally
+    // rather than turning it into "give me everything". Checked before any
+    // HTTP call — including before login — so a bad call never reaches the
+    // network at all.
+    if (include && include.length === 0) {
+      throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
+    }
+    // overlay must be exactly 'mine' when supplied. Anything else would
+    // otherwise be silently dropped by the `=== 'mine'` check below, sending
+    // the request with no overlay param and leaving the caller believing
+    // they hold their staged edits. Same locally-before-HTTP precedent as
+    // the include check above.
+    if (opts.overlay !== undefined && opts.overlay !== 'mine') {
+      throw new LenderApiError('overlay must be "mine" when supplied', { statusCode: 400 })
+    }
     return this.withAuth(async (headers) => {
       const base = this.resolveUrl(LenderEndpoint.CANONICAL_VIEW, id)
-      // An EMPTY include is a caller bug the server rejects; sending it would
-      // be indistinguishable from omitting it here, so refuse it locally
-      // rather than turning it into "give me everything".
-      if (include && include.length === 0) {
-        throw new LenderApiError('include was supplied but names no category', { statusCode: 400 })
-      }
-      const url = include?.length ? `${base}?include=${encodeURIComponent(include.join(','))}` : base
+      const params: string[] = []
+      // Each id is encoded BEFORE joining, so a reserved character in an id
+      // (`&`, `#`, `%`, space) cannot corrupt the query string. This is a
+      // property of the RAW request line only: the server percent-decodes the
+      // value before splitting on `,`, so a comma-bearing id would still read
+      // as two ids there. Category ids are kebab-case registry slugs and never
+      // contain a comma, so nothing depends on that case.
+      if (include?.length) params.push(`include=${include.map(encodeURIComponent).join(',')}`)
+      if (opts.overlay === 'mine') params.push('overlay=mine')
+      const url = params.length ? `${base}?${params.join('&')}` : base
 
       try {
         const client = this.createRetryClient()
