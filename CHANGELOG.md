@@ -7,7 +7,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 Entries start at 2.5.0 — the release that introduced this file. Earlier
 versions are described by their GitHub Releases.
 
-## [Unreleased]
+## [2.8.0]
+
+### Changed
+
+- **`@finsys/core` widens from `^8.1.0` to `^8.1.0 || ^9.0.0` (SYS-3555).**
+  Core is a normal `dependency` here, not a peer, so the old range did not
+  ERESOLVE — it did something quieter and worse. Measured, not inferred: a
+  consumer declaring `@finsys/core@^9.0.0` alongside this SDK at `2.7.0`
+  installs **two** copies of core, 9.x at the top level and 8.x nested under
+  this package. The five `Canonical*` envelope types this SDK re-exports then
+  come from a different core than the consumer's own import of them, so they
+  are nominally distinct types that happen to have the same shape. That
+  configuration exists today on `finsys-client`'s `integration/SYS-3433`
+  branch, which declares core `^9.0.0` and this SDK at `2.7.0`.
+
+  Widening rather than moving to `^9.0.0` outright is deliberate: the range
+  still admits 8.x, so this SDK stays installable before core 9.0.0 is cut, and
+  there is no window in which the pair cannot co-install. Core 9.0.0 lands as
+  one publish at the SYS-3433 integration point; nothing here needs re-editing
+  when it does.
+
+  Compatibility with core 9 was measured on the 9.0.0 candidate rather than
+  assumed — `tsc --noEmit` clean and 22/22 tests green under both 8.1.2 and
+  9.0.0. Core 9.0.0's breaking changes are confined to the `Subject*` surface
+  (`SubjectInstance.source`, `subjectViewFromRecords`, raw `instanceKey`); this
+  SDK contains zero `Subject` references, and 9.0.0 leaves application-scope
+  `CanonicalView` untouched.
 
 ## [2.7.0] - 2026-08-18
 
