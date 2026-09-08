@@ -28,6 +28,8 @@ export enum LenderEndpoint {
   /** SYS-3416 — the Phase 5 read pair. See CanonicalView / ApplicationRecord. */
   CANONICAL_VIEW = 'canonical_view',
   APPLICATION_RECORD = 'application_record',
+  /** SYS-3615 — the v2 list. See SubjectApplicationListPage. */
+  APPLICATION_LIST_V2 = 'application_list_v2',
   INSTALLER_LATEST = 'installer_latest',
   INSTALLER_DOWNLOAD_URL = 'installer_download_url',
   INSTALLER_UPDATE_FEED = 'installer_update_feed',
@@ -302,4 +304,197 @@ export interface ApplicationRecord {
     granted: boolean | null
     capturedAt: string | null
   }>
+}
+
+/* ------------------------------------------------------------------ *
+ * SYS-3615 — the v2 application list.
+ *
+ * `getApplicationList` (v1) and `listApplicationsV2` DO NOT MEAN THE SAME
+ * THING, and the difference is not only the envelope:
+ *
+ *   v1 filters and sorts by naming FLAT COLUMNS on the application row
+ *   (`fullName`, `companyName`), and pages by OFFSET.
+ *   v2 names declared SUBJECT LABELS (`subject.companyName`), and pages by
+ *   KEYSET cursor. There is deliberately no total and no page number.
+ *
+ * WHY THESE TYPES ARE NARROW, when `Application` above is not. `Application`
+ * opens with `[key: string]: unknown` and types every field optional, so
+ * `application.fullName` compiles and yields `undefined` whether or not the
+ * server serves the field — a consumer's build cannot detect a shape change,
+ * which is exactly the migration signal a consumer moving off v1 needs. The
+ * v2 list item is therefore declared precisely: every field the endpoint
+ * always emits is REQUIRED (null where the contract says nullable), no index
+ * signature, and a field this SDK version does not know about is a type
+ * error rather than a silent `undefined`. Adding one is an SDK release.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The subject labels this contract declares. A label is an ordered list of
+ * sources resolved to one value; the id is what a filter and a sort name.
+ *
+ * Closed on purpose. A deployment that declares a new label is a contract
+ * change that gets an SDK release — which is the migration signal. The runtime
+ * payload still carries any extra keys; they are simply not typed here.
+ */
+export type SubjectLabelId = 'subject.companyName' | 'subject.personName'
+
+/** Sort keys the endpoint publishes: label ids and record-plane fields only. */
+export type SubjectApplicationSortKey =
+  | 'ihsId'
+  | 'createdAt'
+  | 'updatedAt'
+  | SubjectLabelId
+
+export type SubjectSortDirection = 'ASC' | 'DESC'
+
+/**
+ * One resolved label. `source` is not decoration: a `legacy:`-prefixed source
+ * names a flat column, and a consumer needs to know which of its values rest
+ * on one without making a second call.
+ */
+export interface SubjectLabel {
+  value: string
+  source: string
+}
+
+/**
+ * One row of the v2 list.
+ *
+ * `labels` models ABSENCE, never null: a label no declared source produced —
+ * and equally one this caller is not authorised to see — is missing from the
+ * object. The two are indistinguishable by design, so `Partial<Record<…>>` is
+ * the honest type; a `SubjectLabel | null` would claim a distinction the wire
+ * does not make.
+ */
+export interface SubjectApplicationListItem {
+  ihsId: number
+  status: string
+  statusDescription: string | null
+  programId: number | null
+  programName: string | null
+  borrowerAgentId: number | null
+  /**
+   * v1's list spells this `borrowerAgent` and reads the id off the joined
+   * company row, so a missing company nulls BOTH fields. Here the id is read
+   * off the application, so `{borrowerAgentId: 404, borrowerAgentName: null}`
+   * is a reportable state: a dangling reference, not a hidden one.
+   */
+  borrowerAgentName: string | null
+  totalFinancing: number | null
+  /**
+   * The jurisdiction this row's amounts are denominated in — read it before
+   * rendering any money, because `totalFinancing` carries no currency.
+   *
+   * NULL MEANS MALAYSIA, not "unknown": the column is null on every row filed
+   * before multi-jurisdiction support, and the server does not stamp one in.
+   * Always present, null included.
+   */
+  jurisdiction: string | null
+  /**
+   * ISO 8601, MILLISECOND-truncated, and rendered from a ZONELESS column.
+   *
+   * The same Date→ISO hazard the cursor documentation above spells out, on a
+   * field a consumer can actually read. Upstream selects the raw `DATETIME`
+   * and the DataSource sets neither `dateStrings` nor `timezone`, so the
+   * driver hands Express a JS `Date` and `res.json()` renders it with
+   * `toISOString()`. Two things are lost in that step, both silently:
+   *
+   *   PRECISION. The column is `datetime(6)`; a `Date` is milliseconds. A
+   *   stored `…:39.991297` reaches you as `…:39.991Z`. Roughly a quarter of
+   *   rows measured carried sub-millisecond digits.
+   *
+   *   ZONE. `toISOString()` stamps a `Z` using the API PROCESS's timezone.
+   *   The column stores no zone, so the `Z` is an assertion about where the
+   *   server was configured, not a fact about the row.
+   *
+   * Neither is visible in test, because every harness in this estate runs UTC.
+   *
+   * DO NOT DERIVE `updatedAfter` FROM THIS VALUE. You would be closing a loop
+   * across two clocks: this string is rendered in the API process's zone,
+   * while `updatedAfter` is compared as `updatedAt > FROM_UNIXTIME(?)` in the
+   * MySQL SESSION's zone against that same zoneless column. The watermark
+   * lands off by the two zones' difference plus up to 999µs of truncation, and
+   * the page that comes back — replaying rows, or skipping them — looks
+   * entirely well formed. Carry a watermark you own instead.
+   */
+  createdAt: string
+  /** ISO 8601. Same millisecond truncation and zone caveat as `createdAt` — read it there before using this to page. */
+  updatedAt: string
+  labels: Partial<Record<SubjectLabelId, SubjectLabel>>
+  /**
+   * When this subject's labels were last derived; null when they have not
+   * been. The application is still returned, with no labels. NOT an input to
+   * any resolution rule.
+   */
+  labelsResolvedAt: string | null
+}
+
+export interface SubjectApplicationListPagination {
+  /**
+   * OPAQUE. Pass it back verbatim as `cursor`; null means the last page.
+   *
+   * Its encoding is not part of the contract and this SDK never reads it.
+   * SYS-3611 records what happens when something does: spelled from a JS
+   * `Date`, `toISOString()` renders UTC against a wall-clock `DATETIME` — 8
+   * hours early under `Asia/Kuala_Lumpur` — and millisecond precision loses a
+   * `datetime(6)`'s microseconds. Both silently skip rows, which is
+   * indistinguishable from a correct empty result.
+   */
+  nextCursor: string | null
+  /** The page size the server actually applied (its default and clamp, not the client's). */
+  size: number
+}
+
+export interface SubjectApplicationListPage {
+  list: SubjectApplicationListItem[]
+  pagination: SubjectApplicationListPagination
+}
+
+/**
+ * Options for `listApplicationsV2`. Every one is optional and NOTHING is sent
+ * that the caller did not ask for — the server owns the default page size
+ * (50) and the ceiling (200), and a client-side default would be a second
+ * copy of a policy that has to agree.
+ */
+export interface SubjectApplicationListOptions {
+  /**
+   * Rows per page. Sent verbatim: this SDK does not clamp and does not
+   * reinterpret. The server reads `<= 0` as its default (50), NOT as v1's
+   * "as many as possible" — a caller carrying v1's reading across gets a
+   * page 10x smaller than it asked for, and that belongs in one place.
+   */
+  size?: number
+  /**
+   * A `nextCursor` from a previous page, passed back UNCHANGED. Do not
+   * construct one, do not decode one, and never route one through a `Date`.
+   *
+   * A cursor is bound to the ordering that issued it: re-sending it with a
+   * different `sortBy` or `sort` is a 400, not a re-sorted page. Change the
+   * ordering by starting again with no cursor.
+   */
+  cursor?: string
+  sortBy?: SubjectApplicationSortKey
+  sort?: SubjectSortDirection
+  /**
+   * Substring match per label id. A filter naming a label this caller may not
+   * see is a 400 carrying `VALIDATION_ERROR`, never silently ignored —
+   * ignoring it would answer with a superset of what was asked for.
+   *
+   * Read the code with `lenderErrorCode(error)`. The body is
+   * `{err:{code, desc}}`, so it is at `responseData.err.code`;
+   * `responseData.code` is `undefined` for every refusal this server produces.
+   *
+   * An empty term is REFUSED locally rather than sent, for the same reason an
+   * empty `cursor` is: the server drops an empty filter parameter, so a term
+   * that arrived empty by accident comes back as a well-formed page over the
+   * unfiltered superset.
+   */
+  labels?: Partial<Record<SubjectLabelId, string>>
+  status?: string | readonly string[]
+  programId?: number
+  borrowerAgentId?: number
+  minTotalFinancing?: number
+  maxTotalFinancing?: number
+  /** Unix SECONDS. Applications updated strictly after this instant. */
+  updatedAfter?: number
 }
