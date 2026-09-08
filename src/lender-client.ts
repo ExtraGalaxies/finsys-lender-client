@@ -473,6 +473,7 @@ export class LenderClient {
         params.append('status', status)
       }
     }
+    setNumber('ihsId', opts.ihsId)
     setNumber('programId', opts.programId)
     setNumber('borrowerAgentId', opts.borrowerAgentId)
     setNumber('minTotalFinancing', opts.minTotalFinancing)

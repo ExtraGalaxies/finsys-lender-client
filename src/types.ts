@@ -491,6 +491,16 @@ export interface SubjectApplicationListOptions {
    */
   labels?: Partial<Record<SubjectLabelId, string>>
   status?: string | readonly string[]
+  /**
+   * Return only the application with this id. EQUALITY, not a range —
+   * `ihsId` is the keyset cursor's tiebreaker, so pinning it to one value
+   * is compatible with every ordering while a range would interact with
+   * the cursor comparison.
+   *
+   * Combined with other filters these are ANDed, so an id excluded by one
+   * of them returns an EMPTY page rather than that application.
+   */
+  ihsId?: number
   programId?: number
   borrowerAgentId?: number
   minTotalFinancing?: number
