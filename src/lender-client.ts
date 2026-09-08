@@ -473,7 +473,20 @@ export class LenderClient {
         params.append('status', status)
       }
     }
-    setNumber('ihsId', opts.ihsId)
+    // Not `setNumber`: that accepts 0, negatives and floats, each of which the
+    // server answers with an EMPTY page rather than an error. An empty page to
+    // a caller who believes it named an application is the same
+    // "well-formed page of nothing" this client already refuses to produce for
+    // an empty cursor, an empty label term and an out-of-range updatedAfter.
+    if (opts.ihsId !== undefined) {
+      if (!Number.isSafeInteger(opts.ihsId) || opts.ihsId < 1) {
+        throw new LenderApiError(
+          `ihsId must be a positive integer, got ${String(opts.ihsId)}`,
+          { statusCode: 400 },
+        )
+      }
+      params.set('ihsId', String(opts.ihsId))
+    }
     setNumber('programId', opts.programId)
     setNumber('borrowerAgentId', opts.borrowerAgentId)
     setNumber('minTotalFinancing', opts.minTotalFinancing)
