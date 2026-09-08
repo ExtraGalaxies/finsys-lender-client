@@ -750,3 +750,48 @@ void _dateCursor
 // @ts-expect-error — v1 filter vocabulary does not exist on the v2 options.
 const _v1Vocabulary: SubjectApplicationListOptions = { companyName: 'Acme' }
 void _v1Vocabulary
+
+// --- SYS-3618: filtering by application id ---
+
+test('ihsId is sent as a query parameter, and only when supplied', async () => {
+  const requests: string[] = []
+  const { port, close } = await startServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/login') return loginOk(res)
+    requests.push(req.url ?? '')
+    sendJson(res, 200, pageBody(null, 1))
+  })
+  try {
+    const client = makeClient(port)
+    await client.listApplicationsV2({ ihsId: 42 })
+    await client.listApplicationsV2({})
+
+    const withId = new URL(requests[0]!, 'http://127.0.0.1').searchParams
+    assert.equal(withId.get('ihsId'), '42')
+
+    // The absence case is asserted deliberately. A dropped filter does not
+    // fail on this endpoint -- it answers the caller's whole authorized
+    // cohort, and the server writes a subject-access record for every row it
+    // returns. An always-on parameter and a never-on one are indistinguishable
+    // from the positive assertion alone.
+    const withoutId = new URL(requests[1]!, 'http://127.0.0.1').searchParams
+    assert.equal(withoutId.get('ihsId'), null)
+  } finally {
+    await close()
+  }
+})
+
+test('a non-finite ihsId is refused locally rather than sent', async () => {
+  const { port, close } = await startServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/login') return loginOk(res)
+    sendJson(res, 200, pageBody(null, 0))
+  })
+  try {
+    const client = makeClient(port)
+    await assert.rejects(
+      () => client.listApplicationsV2({ ihsId: Number.NaN }),
+      /ihsId must be a finite number/
+    )
+  } finally {
+    await close()
+  }
+})
