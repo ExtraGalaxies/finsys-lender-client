@@ -344,6 +344,20 @@ export type SubjectApplicationSortKey =
   | 'createdAt'
   | 'updatedAt'
   | SubjectLabelId
+  /**
+   * SYS-3617 — the record-plane fields the list projects, now also sortable.
+   *
+   * NOTE THE SPELLING of the last one: v1 emits this field as `borrowerAgent`
+   * and this endpoint sorts it as `borrowerAgentName`, matching what the v2
+   * list projects. The v1 name is refused, not ignored.
+   *
+   * All three are nullable, and a null sorts as its own rank rather than
+   * wherever the engine puts it, so paging covers a row with no program or no
+   * agent exactly once.
+   */
+  | 'statusDescription'
+  | 'programName'
+  | 'borrowerAgentName'
 
 export type SubjectSortDirection = 'ASC' | 'DESC'
 
