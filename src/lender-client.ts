@@ -19,6 +19,8 @@ import {
   type ApplicationRecord,
   type ApplicationListFilter,
   type ApplicationListResult,
+  type SubjectApplicationListOptions,
+  type SubjectApplicationListPage,
   type StatusUpdateRequest,
   type StatusUpdateResult,
   type DocumentArchive,
@@ -169,7 +171,34 @@ export class LenderClient {
   }
 
   /**
-   * Execute an authenticated request with automatic 401 retry.
+   * Execute an authenticated request, re-logging in ONCE on an auth refusal.
+   *
+   * THE REFUSAL IS A 403, NOT A 401, and that is why this gates on
+   * `isAuthError`. finsys-api's `authorizeLender()` answers an expired or
+   * unverifiable Bearer token with `403 {err:{code:'UNAUTHORIZED_ACCESS'}}` —
+   * `TokenExpiredError` takes the same branch as every other verify failure.
+   * A guard spelled `statusCode === 401` is dead code against the real server,
+   * and only a fixture that sends 401 can make it look alive.
+   *
+   * That matters because the expiry cache is the ONLY thing standing between a
+   * stale token and a permanent hard-failure loop, and it is built on a string
+   * this API was never designed to have parsed: the login response carries no
+   * `expires_in`, only `tokenExpiredDate` as a zoneless 12-hour
+   * `YYYY-MM-DD hh:mm:ss A`, which `new Date(...)` reads in the CLIENT's
+   * timezone. Wherever that parse lands later than the true expiry — a zone
+   * difference, or clock skew past the 30s margin, with no `clockTolerance`
+   * given to `jwt.verify` upstream — the client believes its token is live and
+   * every call fails with no way back. This SDK ships inside a desktop app, on
+   * user-controlled clocks.
+   *
+   * `isAuthError` is `401 || 403`, computed once in `wrapError`; this guard
+   * tracks that definition rather than restating it.
+   *
+   * EXACTLY ONE RETRY, and widening it is bounded and one-sided. A genuine
+   * permission refusal (a lender reaching for a program it may not see) also
+   * answers 403, so it now costs one wasted login and one wasted request
+   * before surfacing the same error. Failing to retry an expired token costs
+   * every subsequent call until the process restarts.
    */
   private async withAuth<T>(fn: (headers: Record<string, string>) => Promise<T>): Promise<T> {
     const headers = await this.authHeaders()
@@ -177,7 +206,7 @@ export class LenderClient {
     try {
       return await fn(headers)
     } catch (error) {
-      if (error instanceof LenderApiError && error.statusCode === 401) {
+      if (error instanceof LenderApiError && error.isAuthError) {
         this.invalidateToken()
         const retryHeaders = await this.authHeaders()
         return fn(retryHeaders)
@@ -306,6 +335,225 @@ export class LenderClient {
           throw new LenderApiError(`Application record ${ihsId} not found`, { statusCode: 404 })
         }
         return response.data.data as ApplicationRecord
+      } catch (error) {
+        throw this.wrapError(error, 'GET', url)
+      }
+    })
+  }
+
+  /**
+   * SYS-3615 — the v2 application list: keyset-paged, filtered and sorted by
+   * declared SUBJECT LABEL rather than by a flat column on the application row.
+   *
+   * NOT a drop-in replacement for getApplicationList, and not a reshaping of
+   * it — v1 is frozen and keeps its own path, its own vocabulary and its own
+   * method here. Three differences a migrating consumer has to decide about:
+   *
+   *   VOCABULARY. Filters and sorts name label ids (`subject.companyName`),
+   *   never `companyName` / `fullName`. A label is an ordered list of sources
+   *   resolved to one value, and every label on the wire carries the `source`
+   *   that won — a `legacy:` prefix names a flat column.
+   *
+   *   PAGINATION IS KEYSET. Pass `pagination.nextCursor` back as `cursor`;
+   *   `null` means the last page. There is no `page` and no total, on
+   *   purpose: offset paging over a live table returns rows twice and skips
+   *   others, which is the duplicate-row behaviour v1 callers work around.
+   *
+   *   ABSENCE. A label no declared source produced — and equally one this
+   *   caller is not authorised to see — is MISSING from `labels`, never null.
+   *   A filter or sort naming a label this caller may not see is a 400
+   *   carrying `VALIDATION_ERROR`, never silently dropped. Read that code with
+   *   `lenderErrorCode(error)`: the body is `{err:{code, desc}}`, so it sits at
+   *   `responseData.err.code` — `responseData.code` is `undefined` for every
+   *   refusal this server produces, and a consumer branching on it silently
+   *   never branches.
+   *
+   * THE CURSOR IS OPAQUE AND MOVES VERBATIM. This method never parses,
+   * decodes, re-encodes or otherwise touches it, in either direction.
+   * SYS-3611 records why: a cursor spelled from a JS `Date` renders UTC via
+   * `toISOString()` against a wall-clock `DATETIME` — eight hours early under
+   * `Asia/Kuala_Lumpur` — and loses a `datetime(6)`'s microseconds to
+   * millisecond precision. Both silently skip rows, and every harness in this
+   * estate runs in UTC, so neither is visible in test.
+   *
+   * NOTHING IS SENT THAT THE CALLER DID NOT ASK FOR. The server owns the
+   * default page size (50) and the ceiling (200); `size` is passed through
+   * unclamped and uninterpreted so that policy lives in one place. Note the
+   * server reads `size <= 0` as its default, NOT as v1's "as many as
+   * possible".
+   *
+   * Options with an unusable value are rejected locally, before any HTTP call
+   * — an empty `cursor`, a `sort` that is neither ASC nor DESC, a non-finite
+   * number. Each would otherwise go out as a dropped or garbage parameter and
+   * come back as a plausible page: an empty cursor in particular would return
+   * page ONE to a caller that believes it is paging forward.
+   */
+  async listApplicationsV2(
+    options?: SubjectApplicationListOptions,
+  ): Promise<SubjectApplicationListPage> {
+    const opts = options ?? {}
+
+    // Same locally-before-HTTP precedent getCanonicalView sets for an empty
+    // `include` and a mistyped `overlay`: refuse here rather than send a
+    // request whose answer would look correct.
+    if (opts.cursor !== undefined && opts.cursor === '') {
+      throw new LenderApiError(
+        'cursor was supplied but is empty — pass a nextCursor verbatim, or omit it to start a new page',
+        { statusCode: 400 },
+      )
+    }
+    if (opts.sort !== undefined) {
+      // Case-insensitive because the server is: it uppercases before
+      // comparing, so rejecting 'asc' here would refuse a call that works.
+      const direction = String(opts.sort).toUpperCase()
+      if (direction !== 'ASC' && direction !== 'DESC') {
+        throw new LenderApiError(`sort must be 'ASC' or 'DESC', got ${String(opts.sort)}`, {
+          statusCode: 400,
+        })
+      }
+    }
+
+    const params = new URLSearchParams()
+    const setNumber = (name: string, value: number | undefined): void => {
+      if (value === undefined) return
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new LenderApiError(`${name} must be a finite number, got ${String(value)}`, {
+          statusCode: 400,
+        })
+      }
+      params.set(name, String(value))
+    }
+
+    // Passed through unclamped and unrounded — see the note above.
+    setNumber('size', opts.size)
+    // VERBATIM, and this line is the whole of the client's cursor handling.
+    if (opts.cursor !== undefined) params.set('cursor', opts.cursor)
+    if (opts.sortBy !== undefined) params.set('sortBy', opts.sortBy)
+    if (opts.sort !== undefined) params.set('sort', opts.sort)
+    if (opts.labels) {
+      for (const [labelId, term] of Object.entries(opts.labels)) {
+        if (term === undefined) continue
+        // An empty term is the empty cursor again, on the request side: the
+        // server DROPS an empty filter parameter, so a term that arrived empty
+        // by accident comes back as a well-formed page over the unfiltered
+        // superset. Omit the key to not filter; do not name it and pass ''.
+        if (term === '') {
+          throw new LenderApiError(
+            `labels['${labelId}'] was supplied but is empty — the server drops an empty term and ` +
+              'would answer with the UNFILTERED superset; omit the key to not filter on it',
+            { statusCode: 400 },
+          )
+        }
+        params.set(labelId, term)
+      }
+    }
+    if (opts.status !== undefined) {
+      // Repeated, never joined: the server reads `status` as a repeatable
+      // parameter, and a comma-joined value would filter for one status
+      // whose name happens to contain a comma.
+      const statuses = Array.isArray(opts.status) ? opts.status : [opts.status as string]
+      // Same reason as the empty label term. `[]` appends nothing, so the
+      // request carries no status filter at all — which is the one thing
+      // "filter to none of these" cannot mean.
+      if (statuses.length === 0) {
+        throw new LenderApiError(
+          'status was supplied but is empty — an empty list sends no filter at all and would ' +
+            'answer with EVERY status; omit `status` to not filter on it',
+          { statusCode: 400 },
+        )
+      }
+      for (const status of statuses) {
+        if (status === '') {
+          throw new LenderApiError(
+            'status contains an empty value — the server drops it, and the page would come back ' +
+              'over the unfiltered superset',
+            { statusCode: 400 },
+          )
+        }
+        params.append('status', status)
+      }
+    }
+    // Not `setNumber`: that accepts 0, negatives and floats, each of which the
+    // server answers with an EMPTY page rather than an error. An empty page to
+    // a caller who believes it named an application is the same
+    // "well-formed page of nothing" this client already refuses to produce for
+    // an empty cursor, an empty label term and an out-of-range updatedAfter.
+    if (opts.ihsId !== undefined) {
+      if (!Number.isSafeInteger(opts.ihsId) || opts.ihsId < 1) {
+        throw new LenderApiError(
+          `ihsId must be a positive integer, got ${String(opts.ihsId)}`,
+          { statusCode: 400 },
+        )
+      }
+      params.set('ihsId', String(opts.ihsId))
+    }
+    setNumber('programId', opts.programId)
+    setNumber('borrowerAgentId', opts.borrowerAgentId)
+    setNumber('minTotalFinancing', opts.minTotalFinancing)
+    setNumber('maxTotalFinancing', opts.maxTotalFinancing)
+    // SECONDS, and out-of-range is a SILENT empty page rather than an error.
+    // The server filters with `updatedAt > FROM_UNIXTIME(?)`, and measured
+    // against MySQL 8 here: FROM_UNIXTIME(1755763445000) is NULL, so is
+    // FROM_UNIXTIME(32536771200), and so is FROM_UNIXTIME(-1) — while
+    // FROM_UNIXTIME(32536771199) is the last accepted second. `x > NULL` is
+    // NULL, which excludes every row, so the caller gets a 200 carrying a
+    // well-formed page of nothing, indistinguishable from "nothing changed".
+    // `Date.now()` is the single likeliest value to reach a `number` field
+    // named after a timestamp, so it is refused by name.
+    if (opts.updatedAfter !== undefined && Number.isFinite(opts.updatedAfter)) {
+      const MAX_FROM_UNIXTIME_SECONDS = 32_536_771_199
+      if (opts.updatedAfter < 0 || opts.updatedAfter > MAX_FROM_UNIXTIME_SECONDS) {
+        throw new LenderApiError(
+          `updatedAfter must be Unix SECONDS in [0, ${MAX_FROM_UNIXTIME_SECONDS}], got ` +
+            `${opts.updatedAfter} — milliseconds (Date.now()) are out of range for MySQL's ` +
+            'FROM_UNIXTIME, which yields NULL and returns a well-formed EMPTY page rather than ' +
+            'an error. Use Math.floor(Date.now() / 1000).',
+          { statusCode: 400 },
+        )
+      }
+    }
+    setNumber('updatedAfter', opts.updatedAfter)
+
+    return this.withAuth(async (headers) => {
+      const base = this.resolveUrl(LenderEndpoint.APPLICATION_LIST_V2)
+      const query = params.toString()
+      const url = query ? `${base}?${query}` : base
+
+      try {
+        const client = this.createRetryClient()
+        const response = await client.get(url, { headers })
+
+        const page = response.data?.data
+        // A 200 that is not this endpoint's envelope is reported, not
+        // defaulted to an empty page: `{list: [], …}` is what a CORRECT empty
+        // result looks like, so degrading to it here would make a
+        // misconfigured endpointOverride indistinguishable from a lender with
+        // no applications. Same posture (and same status code) as the sibling
+        // v2 reads, which treat a missing `data` as a 404.
+        //
+        // THE PAGINATION CHECK IS PER-FIELD AND TYPED, not a truthiness test,
+        // because `pagination: {}` is truthy and would hand back
+        // `{nextCursor: undefined, size: undefined}` under types promising
+        // `string | null` and `number`. That is the empty cursor again, from
+        // the response side: a consumer looping while `nextCursor !== null`
+        // would page forever, re-fetching page one. `getUpdateFeedSas` below
+        // validates each field individually for the same reason.
+        const pagination: unknown = page?.pagination
+        const nextCursor = (pagination as { nextCursor?: unknown } | undefined)?.nextCursor
+        const size = (pagination as { size?: unknown } | undefined)?.size
+        if (
+          !page ||
+          !Array.isArray(page.list) ||
+          typeof pagination !== 'object' ||
+          pagination === null ||
+          !(typeof nextCursor === 'string' || nextCursor === null) ||
+          typeof size !== 'number'
+        ) {
+          throw new LenderApiError('No application list page returned from API', {
+            statusCode: 404,
+          })
+        }
+        return page as SubjectApplicationListPage
       } catch (error) {
         throw this.wrapError(error, 'GET', url)
       }

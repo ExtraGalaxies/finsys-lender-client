@@ -7,6 +7,43 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 Entries start at 2.5.0 — the release that introduced this file. Earlier
 versions are described by their GitHub Releases.
 
+## [2.10.0]
+
+### Added
+
+- **`listApplicationsV2` — the v2 application list (SYS-3615).** `/lender/ihs/list`
+  is frozen and unchanged; this is a new method against a new path. It filters and
+  sorts by declared SUBJECT LABELS rather than by naming flat `ihs` columns, which
+  is what makes a caller survive those columns being dropped. Pagination is KEYSET:
+  pass `cursor` from the previous response's `pagination.nextCursor`, and a null
+  `nextCursor` means the last page. There is deliberately no `page` and no total
+  count — offset paging over a live table returns rows twice and skips others.
+
+- **`ihsId` — filter the list to one application (SYS-3618).** EQUALITY, never a
+  range: `ihsId` is the keyset cursor's tiebreaker, so pinning it to one value is
+  compatible with every ordering while a range would interact with the cursor
+  comparison. Combined with other filters these are ANDed, so an id excluded by one
+  of them returns an empty page rather than that application.
+
+  A non-positive or non-integer value is refused HERE rather than sent. The server
+  answers such a value with an empty page, not an error, and a well-formed page of
+  nothing is indistinguishable from "no such application" for a caller that
+  believes it named one — the same reason this SDK already refuses an empty
+  `cursor`, an empty label term and an out-of-range `updatedAfter`.
+
+- **Three more sort keys (SYS-3617): `statusDescription`, `programName`,
+  `borrowerAgentName`.** The record-plane fields the list already projects.
+
+  **Note the spelling of the last one.** v1 emits this field as `borrowerAgent`;
+  the v2 list projects and sorts it as `borrowerAgentName`, and the server REFUSES
+  the v1 spelling rather than ignoring it. A filter or sort that is ignored on this
+  endpoint does not fail — it answers a wider set — so the refusal is deliberate
+  and the type is what keeps a caller from discovering it at runtime.
+
+  All three are nullable, and a null sorts as its own rank rather than wherever the
+  engine happens to put it, so a page walk covers a row with no program or no agent
+  exactly once.
+
 ## [2.8.0]
 
 ### Changed

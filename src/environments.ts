@@ -23,6 +23,9 @@ export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   // SYS-3416: both are two-segment so neither can be shadowed by '/ihs/:id'.
   [LenderEndpoint.CANONICAL_VIEW]: '/v2/ihs',
   [LenderEndpoint.APPLICATION_RECORD]: '/applications',
+  // SYS-3615: a sibling of '/v2/ihs', not a reshaping of '/ihs/list' — v1 is
+  // frozen and keeps its own path and its own method.
+  [LenderEndpoint.APPLICATION_LIST_V2]: '/v2/applications',
   [LenderEndpoint.INSTALLER_LATEST]: '/installer/latest',
   [LenderEndpoint.INSTALLER_DOWNLOAD_URL]: '/installer/download-url',
   [LenderEndpoint.INSTALLER_UPDATE_FEED]: '/installer/update-feed',
