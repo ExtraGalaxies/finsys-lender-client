@@ -789,8 +789,15 @@ test('a non-finite ihsId is refused locally rather than sent', async () => {
     const client = makeClient(port)
     await assert.rejects(
       () => client.listApplicationsV2({ ihsId: Number.NaN }),
-      /ihsId must be a finite number/
+      /ihsId must be a positive integer/
     )
+    for (const bad of [0, -1, 1.5]) {
+      await assert.rejects(
+        () => client.listApplicationsV2({ ihsId: bad }),
+        /ihsId must be a positive integer/,
+        `ihsId=${bad} must be refused locally, not sent to return an empty page`
+      )
+    }
   } finally {
     await close()
   }
