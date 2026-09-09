@@ -802,3 +802,30 @@ test('a non-finite ihsId is refused locally rather than sent', async () => {
     await close()
   }
 })
+
+// --- SYS-3617: the projected record fields are sortable ---
+
+test('the record-plane sort keys are sent verbatim', async () => {
+  const requests: string[] = []
+  const { port, close } = await startServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/login') return loginOk(res)
+    requests.push(req.url ?? '')
+    sendJson(res, 200, pageBody(null, 1))
+  })
+  try {
+    const client = makeClient(port)
+    for (const key of ['statusDescription', 'programName', 'borrowerAgentName'] as const) {
+      await client.listApplicationsV2({ sortBy: key })
+    }
+    const sent = requests.map((u) => new URL(u, 'http://127.0.0.1').searchParams.get('sortBy'))
+    assert.deepEqual(sent, ['statusDescription', 'programName', 'borrowerAgentName'])
+    // v1's spelling must not appear: the server refuses it rather than
+    // ignoring it, and a silently-renamed key is how a sort becomes a 400 in
+    // production instead of at the type level.
+    for (const url of requests) {
+      assert.equal(new URL(url, 'http://127.0.0.1').searchParams.get('borrowerAgent'), null)
+    }
+  } finally {
+    await close()
+  }
+})
