@@ -1,7 +1,7 @@
 import type { CanonicalAddress, CanonicalView, CanonicalInstance } from './types.js'
 
 /**
- * SYS-3416 — resolve a canonical address against a v2 response.
+ * Resolve a canonical address against a v2 response.
  *
  * WHY THIS SHIPS IN THE SDK RATHER THAN BEING LEFT TO CALLERS. Instance
  * selection is the part every consumer gets subtly different from every other
@@ -17,11 +17,11 @@ import type { CanonicalAddress, CanonicalView, CanonicalInstance } from './types
  * The second is not invented. It is what v1's flat mirror actually did: the
  * wide row could hold one value per field, so a multi-instance category was
  * collapsed latest-wins on the way in. Encoding it here means a consumer
- * migrating off a flat column keeps the behaviour it had, rather than silently
+ * migrating off a flat column keeps the behavior it had, rather than silently
  * acquiring a different one.
  *
  * Returns `undefined` when the fact is not present. That deliberately does NOT
- * distinguish "you are not authorised to see it" from "it was never produced" —
+ * distinguish "you are not authorized to see it" from "it was never produced" —
  * the API refuses to make that distinction, because absence that meant
  * "withheld" would itself disclose that data exists.
  */

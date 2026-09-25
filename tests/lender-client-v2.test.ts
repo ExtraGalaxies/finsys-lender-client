@@ -13,7 +13,7 @@ import {
 } from '../src/index.js'
 
 /**
- * SYS-3415 sweep follow-up — HTTP-level coverage for the two v2 read methods.
+ * HTTP-level coverage for the two v2 read methods.
  *
  * There is no HTTP mocking library in this package's dependency tree, so
  * these tests run a real `http.createServer` on port 0 and point

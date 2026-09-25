@@ -34,7 +34,7 @@ export class LenderApiError extends Error {
  * `'UNAUTHORIZED_ACCESS'`, … — or `undefined` when the body carries none.
  *
  * READ IT THROUGH HERE RATHER THAN OFF `responseData`. finsys-api's global
- * handler serialises every `AppError` as
+ * handler serializes every `AppError` as
  *
  *     { err: { code: <errorCode>, desc: <message> } }
  *

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 ExtraGalaxies
 
-// SYS-3334: the v2 envelope types are @finsys/core's; re-exported below.
+// The v2 envelope types are @finsys/core's; re-exported below.
 import type {
   CanonicalFieldEnvelope,
   CanonicalInstance,
@@ -25,10 +25,10 @@ export enum LenderEndpoint {
   CONSENTS = 'consents',
   CONSENT_DEFINITIONS = 'consent_definitions',
   EXTRACTION_STATUS = 'extraction_status',
-  /** SYS-3416 — the Phase 5 read pair. See CanonicalView / ApplicationRecord. */
+  /** The Phase 5 read pair. See CanonicalView / ApplicationRecord. */
   CANONICAL_VIEW = 'canonical_view',
   APPLICATION_RECORD = 'application_record',
-  /** SYS-3615 — the v2 list. See SubjectApplicationListPage. */
+  /** The v2 list. See SubjectApplicationListPage. */
   APPLICATION_LIST_V2 = 'application_list_v2',
   INSTALLER_LATEST = 'installer_latest',
   INSTALLER_DOWNLOAD_URL = 'installer_download_url',
@@ -242,7 +242,7 @@ export interface ExtractionJobStatus {
 }
 
 /**
- * SYS-3416 — the Phase 5 read pair.
+ * The Phase 5 read pair.
  *
  * `getApplicationDetails` (v1) and `getCanonicalView` (v2) DO NOT MEAN THE SAME
  * THING, and swapping one for the other is not a refactor:
@@ -256,21 +256,18 @@ export interface ExtractionJobStatus {
  */
 
 /*
- * SYS-3334: the five envelope types are OWNED BY @finsys/core and re-exported
- * here. They describe the wire shape of a published API, and every consumer
- * needs them — finhub through its own gateway, a bureau portal later — not
- * only external lenders holding this SDK. Two declarations of one wire shape,
+ * The five envelope types are OWNED BY @finsys/core and re-exported here.
+ * They describe the wire shape of a published API, and every consumer needs
+ * them — finhub through its own gateway, a bureau portal later — not only
+ * external lenders holding this SDK. Two declarations of one wire shape,
  * drifting apart with nothing comparing them, is this estate's signature
  * defect; so the shape is declared once, in the package that already owns the
- * category registry and the field catalogue, and this SDK re-exports it.
+ * category registry and the field catalog, and this SDK re-exports it.
  *
- * Note what 2.5.0 shipped: it DECLARED these interfaces in this file and never
- * exported them from the index — `import type { CanonicalView } from
- * '@finsys/lender-client'` was TS2305. A 2.5.0 consumer held a CanonicalView
- * only as the unnamed return type of `getCanonicalView()`. 2.6.0 is the first
- * release in which the names are importable; `tests/canonical-types-compat.
- * test.ts` proves, both ways, that what such a consumer held is assignable to
- * and from what core now declares.
+ * `tests/canonical-types-compat.test.ts` pins that a consumer built against
+ * this SDK's own signatures (the return type of `getCanonicalView()`, the
+ * resolvers' parameter types) stays assignable, both ways, to what core
+ * declares — so a drift between this package and @finsys/core is caught here.
  */
 export type {
   CanonicalFieldEnvelope,
@@ -281,8 +278,8 @@ export type {
 }
 
 /**
- * SYS-3415 (2.7.0): options for `getCanonicalView`. `overlay: 'mine'` projects
- * the calling lender's own staged edits; see the method's doc.
+ * Options for `getCanonicalView`. `overlay: 'mine'` projects the calling
+ * lender's own staged edits; see the method's doc.
  */
 export interface CanonicalViewOptions {
   include?: readonly string[]
@@ -307,7 +304,7 @@ export interface ApplicationRecord {
 }
 
 /* ------------------------------------------------------------------ *
- * SYS-3615 — the v2 application list.
+ * The v2 application list.
  *
  * `getApplicationList` (v1) and `listApplicationsV2` DO NOT MEAN THE SAME
  * THING, and the difference is not only the envelope:
@@ -345,7 +342,7 @@ export type SubjectApplicationSortKey =
   | 'updatedAt'
   | SubjectLabelId
   /**
-   * SYS-3617 — the record-plane fields the list projects, now also sortable.
+   * The record-plane fields the list projects, sortable here.
    *
    * NOTE THE SPELLING of the last one: v1 emits this field as `borrowerAgent`
    * and this endpoint sorts it as `borrowerAgentName`, matching what the v2
@@ -375,7 +372,7 @@ export interface SubjectLabel {
  * One row of the v2 list.
  *
  * `labels` models ABSENCE, never null: a label no declared source produced —
- * and equally one this caller is not authorised to see — is missing from the
+ * and equally one this caller is not authorized to see — is missing from the
  * object. The two are indistinguishable by design, so `Partial<Record<…>>` is
  * the honest type; a `SubjectLabel | null` would claim a distinction the wire
  * does not make.
@@ -448,9 +445,9 @@ export interface SubjectApplicationListPagination {
    * OPAQUE. Pass it back verbatim as `cursor`; null means the last page.
    *
    * Its encoding is not part of the contract and this SDK never reads it.
-   * SYS-3611 records what happens when something does: spelled from a JS
-   * `Date`, `toISOString()` renders UTC against a wall-clock `DATETIME` — 8
-   * hours early under `Asia/Kuala_Lumpur` — and millisecond precision loses a
+   * Here is what happens when something does: spelled from a JS `Date`,
+   * `toISOString()` renders UTC against a wall-clock `DATETIME` — 8 hours
+   * early under `Asia/Kuala_Lumpur` — and millisecond precision loses a
    * `datetime(6)`'s microseconds. Both silently skip rows, which is
    * indistinguishable from a correct empty result.
    */
