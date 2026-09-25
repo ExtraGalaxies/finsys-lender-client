@@ -240,7 +240,7 @@ export class LenderClient {
   }
 
   /**
-   * SYS-3416 — the canonical (v2) read: facts, each carrying its provenance.
+   * The canonical (v2) read: facts, each carrying its provenance.
    *
    * NOT a drop-in replacement for getApplicationDetails. That one merges THIS
    * LENDER'S pending edit overlay before returning, so its values are the
@@ -252,10 +252,10 @@ export class LenderClient {
    * @param options `include`: category ids to narrow to — omitted returns every
    *   category the deployment's registry declares; an unknown id is rejected
    *   by the server with 400 rather than silently dropped, so a typo fails
-   *   loudly. `overlay: 'mine'` (SYS-3415, 2.7.0): project THIS lender's own
-   *   staged, uncommitted field edits onto the view — the thing v1 did for
-   *   you and v2 does only when asked. An overlaid field carries the staged
-   *   value as `value`, `origin: 'manual'`, and the attested value as
+   *   loudly. `overlay: 'mine'`: project THIS lender's own staged, uncommitted
+   *   field edits onto the view — the thing v1 did for you and v2 does only
+   *   when asked. An overlaid field carries the staged value as `value`,
+   *   `origin: 'manual'`, and the attested value as
    *   `originalValue`; the view carries `overlay: {lenderId, applied, …}` so
    *   the payload SAYS which projection you hold. Without it, the view is
    *   facts-only and identical for every lender. A bare array is still
@@ -318,7 +318,7 @@ export class LenderClient {
   }
 
   /**
-   * SYS-3416 — the application record: the facility request, parties, workflow
+   * The application record: the facility request, parties, workflow
    * state and consent references. What the canonical view deliberately omits.
    *
    * A consumer migrating off v1 needs BOTH this and getCanonicalView; neither
@@ -342,8 +342,8 @@ export class LenderClient {
   }
 
   /**
-   * SYS-3615 — the v2 application list: keyset-paged, filtered and sorted by
-   * declared SUBJECT LABEL rather than by a flat column on the application row.
+   * The v2 application list: keyset-paged, filtered and sorted by declared
+   * SUBJECT LABEL rather than by a flat column on the application row.
    *
    * NOT a drop-in replacement for getApplicationList, and not a reshaping of
    * it — v1 is frozen and keeps its own path, its own vocabulary and its own
@@ -357,10 +357,10 @@ export class LenderClient {
    *   PAGINATION IS KEYSET. Pass `pagination.nextCursor` back as `cursor`;
    *   `null` means the last page. There is no `page` and no total, on
    *   purpose: offset paging over a live table returns rows twice and skips
-   *   others, which is the duplicate-row behaviour v1 callers work around.
+   *   others, which is the duplicate-row behavior v1 callers work around.
    *
    *   ABSENCE. A label no declared source produced — and equally one this
-   *   caller is not authorised to see — is MISSING from `labels`, never null.
+   *   caller is not authorized to see — is MISSING from `labels`, never null.
    *   A filter or sort naming a label this caller may not see is a 400
    *   carrying `VALIDATION_ERROR`, never silently dropped. Read that code with
    *   `lenderErrorCode(error)`: the body is `{err:{code, desc}}`, so it sits at
@@ -369,9 +369,9 @@ export class LenderClient {
    *   never branches.
    *
    * THE CURSOR IS OPAQUE AND MOVES VERBATIM. This method never parses,
-   * decodes, re-encodes or otherwise touches it, in either direction.
-   * SYS-3611 records why: a cursor spelled from a JS `Date` renders UTC via
-   * `toISOString()` against a wall-clock `DATETIME` — eight hours early under
+   * decodes, re-encodes or otherwise touches it, in either direction. Here is
+   * why: a cursor spelled from a JS `Date` renders UTC via `toISOString()`
+   * against a wall-clock `DATETIME` — eight hours early under
    * `Asia/Kuala_Lumpur` — and loses a `datetime(6)`'s microseconds to
    * millisecond precision. Both silently skip rows, and every harness in this
    * estate runs in UTC, so neither is visible in test.
@@ -801,7 +801,7 @@ export class LenderClient {
   }
 
   /**
-   * @deprecated SYS-2797 — superseded by getUpdateFeedSas (container-scoped feed SAS
+   * @deprecated Superseded by getUpdateFeedSas (container-scoped feed SAS
    * for electron-updater). Retained until callers migrate.
    * Returns a fresh 24h read-only SAS download URL for the latest installer.
    */

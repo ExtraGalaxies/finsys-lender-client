@@ -20,11 +20,11 @@ export const ENDPOINT_PATHS: Record<LenderEndpoint, string> = {
   [LenderEndpoint.CONSENTS]: '/ihs',
   [LenderEndpoint.CONSENT_DEFINITIONS]: '/consent-definitions',
   [LenderEndpoint.EXTRACTION_STATUS]: '/ihs',
-  // SYS-3416: both are two-segment so neither can be shadowed by '/ihs/:id'.
+  // Both are two-segment so neither can be shadowed by '/ihs/:id'.
   [LenderEndpoint.CANONICAL_VIEW]: '/v2/ihs',
   [LenderEndpoint.APPLICATION_RECORD]: '/applications',
-  // SYS-3615: a sibling of '/v2/ihs', not a reshaping of '/ihs/list' — v1 is
-  // frozen and keeps its own path and its own method.
+  // A sibling of '/v2/ihs', not a reshaping of '/ihs/list' — v1 is frozen and
+  // keeps its own path and its own method.
   [LenderEndpoint.APPLICATION_LIST_V2]: '/v2/applications',
   [LenderEndpoint.INSTALLER_LATEST]: '/installer/latest',
   [LenderEndpoint.INSTALLER_DOWNLOAD_URL]: '/installer/download-url',

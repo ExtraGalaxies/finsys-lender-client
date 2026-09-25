@@ -4,16 +4,14 @@ import { resolveCanonicalValue, resolveCanonicalEnvelope } from '../src/canonica
 import type { CanonicalView } from '../src/types.js'
 
 /**
- * SYS-3416 — the instance-selection rules.
+ * The instance-selection rules.
  *
  * These are pinned because they are the part every consumer would otherwise
  * derive independently, and the differences would be SILENT: picking the wrong
  * instance yields a plausible value, not an error. A lender scoring against the
  * wrong phone number or the wrong month's balance gets a wrong decision with
- * every success signal true.
- *
- * This is also the package's first test. It shipped to third parties with none,
- * and the resolver is subtle enough that "it compiles" is not evidence.
+ * every success signal true. The resolver is subtle enough that "it compiles"
+ * is not evidence.
  */
 
 const view = (instances: Array<Record<string, unknown>>): CanonicalView =>

@@ -16,23 +16,23 @@ import {
 } from '../src/index.js'
 
 /**
- * SYS-3615 — HTTP-level coverage for `listApplicationsV2`.
+ * HTTP-level coverage for `listApplicationsV2`.
  *
  * Same harness as `lender-client-v2.test.ts`: a real `http.createServer` on
  * port 0 with `endpointOverrides` pointed at it, because the assertions that
  * matter here are about the BYTES that leave this process — a cursor passed
  * back unchanged, and no default the caller did not ask for.
  *
- * THE CURSOR ASSERTIONS ARE THE POINT. SYS-3611 records that spelling a
- * cursor from a JS `Date` was wrong twice over: `toISOString()` renders UTC
- * against a wall-clock `DATETIME` (eight hours early under
- * `Asia/Kuala_Lumpur`) and a `Date` is millisecond-precision against a
- * `datetime(6)`. Both silently skip rows, and no harness in this estate runs
- * outside UTC, so the client-side half is pinned here: the cursor is an
- * OPAQUE STRING and this SDK must move it verbatim in both directions.
+ * THE CURSOR ASSERTIONS ARE THE POINT. Spelling a cursor from a JS `Date`
+ * was wrong twice over: `toISOString()` renders UTC against a wall-clock
+ * `DATETIME` (eight hours early under `Asia/Kuala_Lumpur`) and a `Date` is
+ * millisecond-precision against a `datetime(6)`. Both silently skip rows, and
+ * no harness in this estate runs outside UTC, so the client-side half is
+ * pinned here: the cursor is an OPAQUE STRING and this SDK must move it
+ * verbatim in both directions.
  *
  * The two cursors below are deliberately chosen so that a JSON round-trip is
- * DETECTABLE: `CURSOR_JSON_SPACED` re-serialises to different bytes (the
+ * DETECTABLE: `CURSOR_JSON_SPACED` re-serializes to different bytes (the
  * spaces are dropped), and `CURSOR_OPAQUE` is not JSON at all.
  */
 
@@ -751,7 +751,7 @@ void _dateCursor
 const _v1Vocabulary: SubjectApplicationListOptions = { companyName: 'Acme' }
 void _v1Vocabulary
 
-// --- SYS-3618: filtering by application id ---
+// --- Filtering by application id ---
 
 test('ihsId is sent as a query parameter, and only when supplied', async () => {
   const requests: string[] = []
@@ -803,7 +803,7 @@ test('a non-finite ihsId is refused locally rather than sent', async () => {
   }
 })
 
-// --- SYS-3617: the projected record fields are sortable ---
+// --- The projected record fields are sortable ---
 
 test('the record-plane sort keys are sent verbatim', async () => {
   const requests: string[] = []

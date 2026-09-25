@@ -21,9 +21,9 @@ import {
 } from '../src/index.js'
 
 /**
- * SYS-3334 — the five envelope types moved to @finsys/core and this SDK now
- * re-exports them. This file proves that move changed NOTHING for a consumer
- * of the previous release, in the only place both declarations exist at once:
+ * The five envelope types moved to @finsys/core and this SDK now re-exports
+ * them. This file proves that move changed NOTHING for a consumer of the
+ * previous release, in the only place both declarations exist at once:
  * `lender-client-2.5.0` is the published 2.5.0, installed under an alias.
  *
  * WHY THE OLD TYPES ARE DERIVED RATHER THAN IMPORTED. 2.5.0 declared these
@@ -95,14 +95,14 @@ type _r2 = Assert<Assignable<ApplicationRecord, Record250>>
 // members: `{a: 1}` is assignable to `{a: 1; b?: 2}` and back, so core could
 // drop or rename `confidence?`, `origin?` or `runId?` — the provenance fields a
 // consumer uses to decide whether to trust a value — with every pin above still
-// green. Review found exactly that gap. `keyof Old ⊆ keyof New` catches it: a
-// dropped optional member is a missing key, a renamed one too.
+// green. `keyof Old ⊆ keyof New` catches it: a dropped optional member is a
+// missing key, a renamed one too.
 //
 // ONE direction, deliberately. `keyof New ⊆ keyof Old` would forbid core from
 // ADDING an optional member, and core's stated contract for these five types
 // (src/canonical-view.ts, 8.0.0) is that an added optional member is a MINOR.
-// 8.1.0 did exactly that (`originalValue?`, `overlay?`, SYS-3415) and this
-// pin went red until it said what the contract says.
+// A later core release added exactly such members (`originalValue?`,
+// `overlay?`), and this pin went red until it said what the contract says.
 type _kv1 = Assert<Assignable<keyof View250, keyof CanonicalView>>
 type _ka1 = Assert<Assignable<keyof Address250, keyof CanonicalAddress>>
 type _ke1 = Assert<Assignable<keyof Envelope250, keyof CanonicalFieldEnvelope>>
